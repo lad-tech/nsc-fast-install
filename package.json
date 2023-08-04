@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "description": "Fast dependencies install for builds docker images of monorepo",
   "types": "dist/types/index.d.ts",
+  "private": false,
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "scripts": {
     "build": "rm -rf dist/ && tsc &&  chmod +x dist/bin/cli.js",
     "test": "echo \"Error: no test specified\" && exit 1",
