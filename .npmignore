@@ -1,1 +1,13 @@
-!/monorepo
+/monorepo
+.dockerignore
+.eslintignore
+.eslintrc.js
+.github/workflows/publish-package-to-npmjs.yml
+.gitlab-ci.yml
+.prettierignore
+.prettierrc.json
+.releaserc
+.releaserc.json
+.idea
+
+
