@@ -11,7 +11,7 @@ async function main() {
     program
       .description('Быстрая установка зависимостей для сборки сервисов в моно репозиториях')
       .requiredOption('--entryPoint  <path>', 'Название стартового файла (index.ts)')
-      .option('--verbose <boolean>', '')
+      .option('--verbose <boolean>', 'Расширенные логи')
       .option('--tsconfig <string>', 'Название конфига для сборки');
     program.parse();
 
