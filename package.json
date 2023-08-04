@@ -1,7 +1,7 @@
 {
   "name": "@lad-tech/nsc-fast-install",
   "version": "1.0.0",
-  "description": "",
+  "description": "Fast dependencies install for builds docker images of monorepo",
   "types": "dist/types/index.d.ts",
   "scripts": {
     "build": "rm -rf dist/ && tsc &&  chmod +x dist/bin/cli.js",
@@ -44,6 +44,19 @@
     "gitignore-parser": "^0.0.2",
     "precinct": "^11.0.5"
   },
-  "author": "Blynskyniki",
-  "license": "ISC"
+  "author": "DevHive crew",
+  "license": "MIT",
+  "keywords": [
+    "@lad-tech/nsc-fast-install",
+    "nsc-toolkit",
+    "cli",
+    "nats",
+    "service",
+    "monorepo",
+    "dependencies"
+  ],
+  "bugs": {
+    "url": "https://github.com/lad-tech/nsc-fast-install/issues"
+  },
+  "homepage": "https://github.com/lad-tech/nsc-fast-install#readme"
 }
