@@ -13,6 +13,8 @@ async function main() {
       .requiredOption('--entryPoint  <path>', 'Название стартового файла (index.ts)')
       .option('--verbose <boolean>', 'Расширенные логи')
       .option('--tsconfig <string>', 'Название конфига для сборки');
+
+
     program.parse();
 
     const options = program.opts();
