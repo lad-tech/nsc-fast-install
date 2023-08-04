@@ -5,57 +5,44 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 // @ts-ignore
 import * as precinct from 'precinct';
-import { PackageLockLike } from './types';
+import { PackageJsonLike, PackageLockLike, TsConfigLike } from './types';
 
-export type TsConfigLike = {
-  compilerOptions?: {
-    outDir?: string;
-    baseUrl?: string;
-  };
-};
-export async function findOutDir(workDir: string, configName: string) {
+export interface ParseTsConfigParams {
+  workDir: string;
+  configName: string;
+}
+
+export async function parseTsConfig(data: ParseTsConfigParams): Promise<TsConfigLike> {
+  const { workDir, configName } = data;
   const list = await fs.readdir(workDir);
   if (!list.includes(configName)) {
-    throw new Error(`tsconfig.json not found in ${workDir} directory. Use --tsconfig for custom config name `);
+    throw new Error(`tsconfig.json not found in ${workDir} directory. Use --tsconfig for custom config name`);
   }
-  let tsConfig: TsConfigLike;
   try {
-    tsConfig = await import(path.resolve(workDir, configName));
+    return (await import(path.resolve(workDir, configName))) as TsConfigLike;
   } catch (e) {
-    console.error('Parse tsconfig error:', e);
-    return null;
+    if (e instanceof Error) {
+      throw new Error(`tsconfig.json parsing error. Use --tsconfig for custom config name \n ${e.message || ''}`);
+    }
+    throw new Error(`tsconfig.json parsing error. Use --tsconfig for custom config name`);
   }
+}
 
-  if (tsConfig?.compilerOptions?.outDir) {
-    const outDir = path.resolve(workDir, tsConfig.compilerOptions?.outDir);
-    // if (tsConfig?.compilerOptions?.baseUrl) {
-    //   const b = path.resolve(workDir, tsConfig?.compilerOptions?.baseUrl);
-    //   const c = path.normalize(path.relative(b, workDir));
-    //   outDir = path.resolve(workDir, tsConfig.compilerOptions?.outDir, c);
-    // }
-
+export async function getOutDir(data: { tsConfig: TsConfigLike; workDir: string }) {
+  if (data.tsConfig.compilerOptions?.outDir) {
     try {
+      const outDir = path.resolve(data.workDir, data.tsConfig.compilerOptions?.outDir);
+
       await fs.access(outDir);
       return outDir;
     } catch (err: any) {
-      return null;
+      throw 'Dist dir not found. Did you forget to build?';
     }
   }
-  return null;
 }
-export async function findOutDirEntry(workDir: string, configName: string) {
-  const list = await fs.readdir(workDir);
-  if (!list.includes(configName)) {
-    throw new Error(`tsconfig.json not found in ${workDir} directory. Use --tsconfig for custom config name `);
-  }
-  let tsConfig: TsConfigLike;
-  try {
-    tsConfig = await import(path.resolve(workDir, configName));
-  } catch (e) {
-    console.error('Parse tsconfig error:', e);
-    throw e;
-  }
 
+export async function findOutDirEntry(data: { tsConfig: TsConfigLike; workDir: string; entryPoint: string }) {
+  const { workDir, tsConfig, entryPoint } = data;
   if (tsConfig?.compilerOptions?.outDir) {
     let outDir = path.resolve(workDir, tsConfig.compilerOptions?.outDir);
     if (tsConfig?.compilerOptions?.baseUrl) {
@@ -63,11 +50,41 @@ export async function findOutDirEntry(workDir: string, configName: string) {
       const c = path.normalize(path.relative(b, workDir));
       outDir = path.resolve(workDir, tsConfig.compilerOptions?.outDir, c);
     }
-
     await fs.access(outDir);
-    return outDir;
+    return path.resolve(outDir, path.basename(entryPoint).replace('ts', 'js'));
   }
-  return path.resolve(workDir);
+  return path.resolve(workDir, path.basename(entryPoint).replace('ts', 'js'));
+}
+const DEFAULT_ENTRY_POINTS = ['start.ts', 'service.ts', 'index.ts'];
+export async function findServiceEntry(data: { workDir: string; verbose: boolean }) {
+  const { workDir, verbose } = data;
+  const list = await fs.readdir(workDir);
+  if (list.includes('package.json')) {
+    if (verbose) console.log('Search entry with package.json main');
+    let p = undefined;
+    try {
+      p = (await import(path.resolve(workDir, 'package.json'))) as PackageJsonLike;
+
+      if (p && p?.main) {
+        const entry = path.resolve(workDir, p?.main);
+        await fs.access(entry);
+        console.info(`Entry for package.json  found => ${entry}`);
+        return entry;
+      }
+    } catch (e) {}
+  }
+  for (const itemEntry of DEFAULT_ENTRY_POINTS) {
+    if (list.includes(itemEntry)) {
+      try {
+        const entry = path.resolve(workDir, itemEntry);
+        await fs.access(entry);
+        console.info(`Entry for package.json  found => ${entry}`);
+        return entry;
+      } catch (e) {}
+    }
+  }
+
+  throw new Error(`Entry for ${workDir} not found. Use --entryPoint `);
 }
 
 export async function parsePackageLock(dir: string) {

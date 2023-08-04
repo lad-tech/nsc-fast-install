@@ -11,7 +11,8 @@
   "scripts": {
     "build": "rm -rf dist/ && tsc &&  chmod +x dist/bin/cli.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "fastInstall": "cd monorepo && npx ts-node ../bin/cli.ts --entryPoint services/ExampleService/start.ts",
+    "fastInstall": "cd monorepo && npx ts-node ../bin/cli.ts --entryPoint services/ExampleService/start.ts --verbose true",
+    "fastInstall2": "cd monorepo && npx ts-node ../bin/cli.ts --service services/ExampleService ",
     "semantic-release": "semantic-release"
   },
   "bin": {

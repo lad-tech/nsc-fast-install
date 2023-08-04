@@ -1,7 +1,16 @@
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
-import { collectDeps, execCmd, findOutDir, findOutDirEntry, parseDepName, parsePackageLock } from '../helpers';
+import {
+  collectDeps,
+  execCmd,
+  findOutDirEntry,
+  findServiceEntry,
+  getOutDir,
+  parseDepName,
+  parsePackageLock,
+  parseTsConfig,
+} from '../helpers';
 import { Timer } from '../Timer';
 
 const MAX_SHELL_COMMAND_LENGTH = 100000;
@@ -10,36 +19,51 @@ async function main() {
     const program = new Command();
     program
       .description('Быстрая установка зависимостей для сборки сервисов в моно репозиториях')
-      .requiredOption('--entryPoint  <path>', 'Название стартового файла (index.ts)')
+      .option('--entryPoint  <path>', 'Путь от корня проекта (services/ExampleService/index.ts)')
+      .option('--service  <path>', 'Путь от корня проекта до сервиса (services/ExampleService)')
       .option('--verbose <boolean>', 'Расширенные логи')
       .option('--tsconfig <string>', 'Название конфига для сборки');
-
 
     program.parse();
 
     const options = program.opts();
+    if (!options.entryPoint && !options.service) {
+      throw ' Use --entryPoint or --service for fast deps install';
+    }
+
     const verbose = options.verbose || false;
-    const tsconfig = options.tsconfig || 'tsconfig.json';
-    const workDir = path.dirname(path.resolve(options.entryPoint));
+    const configName = options.tsconfig || 'tsconfig.json';
+    const workDir = path.resolve(options.entryPoint || options.service);
     const cwd = process.cwd();
+    console.log('cwd', cwd, options.service);
+    if (!options.entryPoint) {
+      options.entryPoint = await findServiceEntry({
+        verbose,
+        workDir,
+      });
+    }
 
     const prepareTimer = new Timer('Prepare');
     const scanTimer = new Timer('Scan');
     const copyTimer = new Timer('Copy');
-
     const totalTimer = new Timer('TOTAL');
+
     totalTimer.start();
     prepareTimer.start();
 
     process.chdir(workDir);
-    const outDir = await findOutDir(workDir, tsconfig);
-    if (outDir == null) {
+
+    const tsConfig = await parseTsConfig({
+      workDir,
+      configName,
+    });
+
+    const outDir = await getOutDir({ workDir, tsConfig });
+    if (!outDir) {
       throw 'Dist dir not found. Did you forget to build?';
     }
-    const preparedEntry = path.resolve(
-      await findOutDirEntry(workDir, tsconfig),
-      path.basename(options.entryPoint).replace('ts', 'js'),
-    );
+
+    const preparedEntry = await findOutDirEntry({ workDir, tsConfig, entryPoint: options.entryPoint });
 
     console.log(`Building node_modules in ${outDir}`);
     if (verbose) {
