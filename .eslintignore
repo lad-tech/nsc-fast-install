@@ -1,0 +1,7 @@
+*.test.ts
+*.spec.ts
+install-local-deps.js
+*/__mocks__/*.ts
+*/__stubs__/*.ts
+*/node_modules/*
+commitlint.config.js

@@ -1,0 +1,14 @@
+{
+  "extends": "../../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "declarationDir": "dist/types",
+    "baseUrl": "../",
+    "lib": ["es2019"],
+    "sourceRoot": ".",
+    "resolveJsonModule": true
+  },
+  "include": [
+    "./", "../node_modules"],
+  "exclude": ["node_modules"]
+}

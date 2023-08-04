@@ -1,0 +1,23 @@
+**/.idea
+**/.vscode
+**/node_modules
+**/dist
+**/.nyc_output
+**/coverage
+/.scannerwork/
+**/test-report.xml
+**/Catalog/elastic/filesGoods/*
+### macOS stuff
+**/.DS_Store
+**/.AppleDouble
+**/.LSOverride
+test.report.xml
+**/storage/
+
+local.run/envs/*.env
+local.run/logs
+
+
+/.run/
+!/monorepo/services/ExampleService/dist/
+!/monorepo/node_modules

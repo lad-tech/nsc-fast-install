@@ -1,0 +1,42 @@
+include:
+  - project: 'devops/ci-templates'
+    ref: $CI_GLOBAL_TEMPLATES_TAG
+    file:
+      - '/templates/extend-gitlab-runners-tags.yml'
+
+.rules:
+  rules:
+    - if: '$CI_COMMIT_BRANCH == "master"'
+    - if: '$CI_MERGE_REQUEST_TARGET_BRANCH_NAME == "master"'
+    - if: '$CI_COMMIT_TAG'
+
+stages:
+ - child-pipeline-generator
+ - child-pipeline-trigger
+
+generate-child-pipeline:
+  stage: child-pipeline-generator
+  image: rlab.lad24.ru/pro-peoples/flexoci:$CI_PROJECT_TEMPLATES_TAG
+  variables: 
+    GIT_STRATEGY: fetch
+    GIT_DEPTH: "5"
+  extends:
+    - .tag-build-app
+    - .rules
+  script:
+    - cd /app
+    - python3 main.py
+  artifacts:
+    paths:
+      - child-pipeline-gitlab-ci.yml
+
+trigger-child-pipeline:
+  extends:
+    - .rules
+  stage: child-pipeline-trigger
+  needs: ["generate-child-pipeline"]
+  trigger:
+    include:
+      - artifact: child-pipeline-gitlab-ci.yml
+        job: generate-child-pipeline
+    strategy: depend

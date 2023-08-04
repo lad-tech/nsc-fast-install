@@ -1,0 +1,38 @@
+{
+  "name": "settings",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.ts",
+  "scripts": {
+    "test": "rm -rf ./dist && NODE_PATH=../ npx jest --coverage",
+    "build": "rm -rf ./dist && NODE_PATH=../ npx tsc --preserveSymlinks",
+    "start": "rm -rf ./dist && NODE_PATH=../ ts-node ./start.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "coverageReporters": [
+      [
+        "lcov",
+        {
+          "projectRoot": "../../"
+        }
+      ]
+    ],
+    "reporters": [
+      "default",
+      [
+        "jest-sonar",
+        {
+          "outputDirectory": "./",
+          "outputName": "test-report.xml",
+          "reportedFilePath": "relative",
+          "relativeRootDir": "<rootDir>/../../../"
+        }
+      ]
+    ]
+  }
+}

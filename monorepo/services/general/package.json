@@ -1,0 +1,38 @@
+{
+  "name": "general",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "test": "rm -rf ./dist && NODE_PATH=../../ ../../node_modules/.bin/jest -i --coverage",
+    "build": "rm -rf ./dist && NODE_PATH=../../ ../../node_modules/.bin/tsc --preserveSymlinks"
+  },
+  "keywords": [],
+  "author": "LAD",
+  "license": "ISC",
+  "dependencies": {},
+  "devDependencies": {},
+  "jest": {
+    "preset": "ts-jest",
+    "testEnvironment": "node",
+    "coverageReporters": [
+      [
+        "lcov",
+        {
+          "projectRoot": "../../"
+        }
+      ]
+    ],
+    "reporters": [
+      "default",
+      [
+        "jest-sonar",
+        {
+          "outputDirectory": "./",
+          "outputName": "test-report.xml",
+          "reportedFilePath": "relative",
+          "relativeRootDir": "<rootDir>/../../../"
+        }
+      ]
+    ]
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "outDir": "dist",
+    "declarationDir": "dist/types",
+
+    "declaration": true,
+    "sourceMap": true,
+    "strictNullChecks": true,
+    "removeComments": true,
+    "strict": true,
+    "target": "es2019",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "skipLibCheck": true,
+    "allowJs": false,
+    "resolveJsonModule": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "strictPropertyInitialization": false,
+    "lib": ["es2019"],
+        "typeRoots": ["./node_modules/@types"]
+  },
+  "include": ["."],
+  "exclude": ["node_modules","monorepo"]
+}

@@ -1,0 +1,204 @@
+{
+  "name": "Settings",
+  "description": "Сервис для работы админки",
+  "methods": {
+    "GetEmails": {
+      "action": "GetEmails",
+      "description": "Получение списка адресов электронных почт для рассылки письма о создании ШР",
+      "request": {},
+      "response": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "uuid": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "email": {
+              "type": "string",
+              "format": "email"
+            }
+          }
+        },
+        "required": ["uuid", "email"]
+      }
+    },
+    "AddEmails": {
+      "action": "AddEmails",
+      "description": "Добавить адрес в список электронных почт для рассылки письма о создании ШР",
+      "request": {
+        "type": "object",
+        "properties": {
+          "emails": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 10,
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": ["emails"]
+      },
+      "response": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "string"
+          },
+          "list": {
+            "type": "array",
+            "minItems": 0,
+            "maxItems": 10,
+            "items": {
+              "type": "object",
+              "properties": {
+                "uuid": {
+                  "type": "string",
+                  "format": "uuid"
+                },
+                "email": {
+                  "type": "string",
+                  "format": "email"
+                }
+              },
+              "required": ["uuid", "email"]
+            }
+          }
+        },
+        "required": ["list"]
+      }
+    },
+    "DeleteEmails": {
+      "action": "DeleteEmails",
+      "description": "Удалить адрес из списка электронных почт для рассылки письма о создании ШР",
+      "request": {
+        "type": "object",
+        "properties": {
+          "uuid": {
+            "type": "string",
+            "format": "uuid"
+          }
+        },
+        "required": ["uuid"]
+      },
+      "response": {
+        "type": "array",
+        "minItems": 0,
+        "maxItems": 10,
+        "items": {
+          "type": "object",
+          "properties": {
+            "uuid": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "email": {
+              "type": "string",
+              "format": "email"
+            }
+          }
+        },
+        "required": ["uuid", "email"]
+      }
+    }
+  },
+  "events": {
+    "list": {
+      "StaffingCreatedWithEmails": {
+        "action": "StaffingCreatedWithEmails",
+        "options": {
+          "stream": true
+        },
+        "description": "Событие отправки письма при создании штатного расписания (Settings -> Report)",
+        "event": {
+          "type": "object",
+          "properties": {
+            "emails": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "authorName": {
+              "type": "string"
+            },
+            "orgName": {
+              "type": "string"
+            },
+            "startDate": {
+              "type": "string"
+            },
+            "goToStaffingLink": {
+              "type": "string"
+            },
+            "staffList": {
+              "$ref": "SettingsServiceAdditional.json#/properties/staffListNewReport"
+            }
+          },
+          "required": ["emails", "authorName", "orgName", "startDate", "staffList", "goToStaffingLink"]
+        }
+      }
+    },
+    "streamOptions": {
+      "prefix": "stream",
+      "actions": [
+        {
+          "action": "*",
+          "storage": "file",
+          "retentionPolicy": "limits",
+          "discardPolicy": "old",
+          "messageTTL": 1209600,
+          "duplicateTrackingTime": 86400,
+          "replication": 1,
+          "rollUps": true
+        }
+      ]
+    }
+  },
+  "Ref": {
+    "$id": "SettingsServiceAdditional.json",
+    "type": "object",
+    "properties": {
+      "staffListNewReport": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string"
+            },
+            "subdivision": {
+              "type": "string"
+            },
+            "parent": {
+              "type": "string"
+            },
+            "position": {
+              "type": "string"
+            },
+            "isLeader": {
+              "type": "string"
+            },
+            "employeeFullName": {
+              "type": "string"
+            },
+            "userUuid": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "subdivision",
+            "parent",
+            "position",
+            "isLeader",
+            "employeeFullName",
+            "userUuid"
+          ]
+        }
+      }
+    }
+  }
+}
