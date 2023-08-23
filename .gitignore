@@ -24,3 +24,4 @@ local.run/logs
 **/node_modules
 
 
+/monorepo/services/ExampleService/dist/

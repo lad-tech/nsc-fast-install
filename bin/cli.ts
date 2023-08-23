@@ -33,7 +33,12 @@ async function main() {
 
     const verbose = options.verbose || false;
     const configName = options.tsconfig || 'tsconfig.json';
-    const workDir = path.resolve(options.entryPoint || options.service);
+    let workDir = '';
+    if (options.entryPoint) {
+      workDir = path.dirname(path.resolve(options.entryPoint));
+    } else {
+      workDir = path.resolve(options.service);
+    }
     const cwd = process.cwd();
     console.log('cwd', cwd, options.service);
     if (!options.entryPoint) {

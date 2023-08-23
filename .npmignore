@@ -2,7 +2,7 @@
 .dockerignore
 .eslintignore
 .eslintrc.js
-.github/workflows/publish-package-to-npmjs.yml
+.github
 .gitlab-ci.yml
 .prettierignore
 .prettierrc.json
@@ -11,3 +11,32 @@
 .idea
 
 
+# Hidden folders
+
+# Backup files
+*~
+
+# Logs
+*.log
+*.ts
+bin
+
+# Node.js
+node_modules/
+
+# Test coverage
+coverage/
+
+*.tgz
+
+# Yarn - package manager
+yarn.lock
+
+# PNPM - package manager
+shrinkwrap.yaml
+
+# Project sources
+img
+tsconfig.json
+commitlint.config.js
+types.ts
