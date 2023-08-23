@@ -1,5 +1,5 @@
 import { exec, ExecException, ExecOptions } from 'child_process';
-import * as cabinet from 'filing-cabinet';
+import cabinet from 'filing-cabinet';
 import * as fss from 'fs';
 import * as fs from 'fs/promises';
 import * as path from 'path';

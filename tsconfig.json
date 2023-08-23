@@ -1,25 +1,22 @@
 {
   "compilerOptions": {
-    "outDir": "dist",
-    "declarationDir": "dist/types",
-
-    "declaration": true,
     "sourceMap": true,
+    "declaration": true,
     "strictNullChecks": true,
-    "removeComments": true,
-    "strict": true,
-    "target": "es2019",
     "module": "commonjs",
-    "moduleResolution": "node",
-    "skipLibCheck": true,
+    "target": "es2019",
     "allowJs": false,
     "resolveJsonModule": true,
+    "skipLibCheck": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "strictPropertyInitialization": false,
-    "lib": ["es2019"],
-        "typeRoots": ["./node_modules/@types"]
+    "outDir": "./dist",
+    "declarationDir": "./dist/types/",
+    "esModuleInterop": true,                             /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
+    "forceConsistentCasingInFileNames": true,            /* Ensure that casing is correct in imports. */
+    "strict": true                                      /* Enable all strict type-checking options. */
   },
   "include": ["."],
   "exclude": ["node_modules","monorepo"]
 }
+
