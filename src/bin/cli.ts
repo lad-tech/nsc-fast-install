@@ -1,3 +1,5 @@
+#! /usr/bin/env node
+
 import { Command } from 'commander';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -40,7 +42,9 @@ async function main() {
       workDir = path.resolve(options.service);
     }
     const cwd = process.cwd();
-    console.log('cwd', cwd, options.service);
+    if (verbose) {
+      console.log('cwd', cwd, 'workDir', workDir);
+    }
     if (!options.entryPoint) {
       options.entryPoint = await findServiceEntry({
         verbose,
