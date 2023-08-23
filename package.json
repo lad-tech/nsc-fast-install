@@ -16,7 +16,7 @@
     "semantic-release": "semantic-release"
   },
   "bin": {
-    "nsc-fast-install": "./dist/bin/cli.js"
+    "fast-deps-install": "./dist/bin/cli.js"
   },
   "devDependencies": {
     "@commitlint/cli": "^17.2.0",
