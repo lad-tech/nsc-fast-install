@@ -203,24 +203,36 @@ function extractDepName(parts: { [x: string]: any }, nodeModulesIdx: number) {
   return depName;
 }
 function collectPeerDeps(firstOrderDeps: Set<string>, cwd: string) {
-  const ret = new Set<string>();
+  const requiredPeerDeps = new Set<string>();
+  const optionalPeerDeps = new Set<string>();
 
   for (const dep of firstOrderDeps) {
     const packageJsonFile = path.join(cwd, 'node_modules', dep, 'package.json');
-    let packageJson;
+    let packageJson: PackageJsonLike;
     try {
       packageJson = require(packageJsonFile) || {};
     } catch {
+      packageJson = {
+        peerDependencies: {},
+        peerDependenciesMeta: {},
+      };
       throw new Error(`Error reading package.json of first order dep ${dep}`);
     }
-    Object.keys(packageJson.peerDependencies || {}).forEach(ret.add);
+
+    for (const depName in packageJson.peerDependencies) {
+      if (packageJson?.peerDependenciesMeta?.[depName]?.optional === true) {
+        optionalPeerDeps.add(depName);
+      } else {
+        requiredPeerDeps.add(depName);
+      }
+    }
   }
 
-  return ret;
+  return { requiredPeerDeps, optionalPeerDeps };
 }
 function collectFirstOrderDeps(data: { entrypoint: string; baseDir: string; cwd: string }) {
   const { cwd, baseDir, entrypoint } = data;
-  const ret = new Set<string>();
+  const requiredDeps = new Set<string>();
   const visited = new Set();
   const nonExistent = new Set();
 
@@ -248,7 +260,7 @@ function collectFirstOrderDeps(data: { entrypoint: string; baseDir: string; cwd:
         if (depth === 1) {
           const depName = extractDepName(parts, nodeModulesIdx);
 
-          ret.add(depName);
+          requiredDeps.add(depName);
         }
       } else {
         visitFile(dep);
@@ -258,13 +270,10 @@ function collectFirstOrderDeps(data: { entrypoint: string; baseDir: string; cwd:
 
   visitFile(entrypoint);
 
-  const peerDeps = collectPeerDeps(ret, cwd);
+  const { requiredPeerDeps, optionalPeerDeps } = collectPeerDeps(requiredDeps, cwd);
+  requiredPeerDeps.forEach(peerDep => requiredDeps.add(peerDep));
 
-  for (const peerDep of peerDeps) {
-    ret.add(peerDep);
-  }
-
-  return { resolved: ret, nonExistent };
+  return { resolved: requiredDeps, nonExistent, optionalPeerDeps };
 }
 export function collectDeps(data: {
   entrypoint: string;
@@ -274,7 +283,11 @@ export function collectDeps(data: {
   options: { verbose: boolean };
 }) {
   const { cwd, packageLock, options, baseDir, entrypoint } = data;
-  const { resolved: firstOrderDeps, nonExistent } = collectFirstOrderDeps({
+  const {
+    resolved: firstOrderDeps,
+    nonExistent,
+    optionalPeerDeps,
+  } = collectFirstOrderDeps({
     entrypoint,
     baseDir,
     cwd,
@@ -286,11 +299,14 @@ export function collectDeps(data: {
 
   const higherOrderDeps = collectHigherOrderDeps(firstOrderDeps, packageLock, cwd, options);
 
-  console.log(`Found ${firstOrderDeps.size} first order deps and ${higherOrderDeps.length} higher order deps`);
+  console.log(
+    `Found ${firstOrderDeps.size} first order deps and ${higherOrderDeps.length} higher order deps and ${optionalPeerDeps.size} optional peer deps`,
+  );
 
   return {
-    firstOrderDeps: Array.from(firstOrderDeps) as string[],
-    higherOrderDeps: higherOrderDeps as string[],
+    firstOrderDeps: Array.from(firstOrderDeps),
+    higherOrderDeps: Array.from(higherOrderDeps),
+    optionalPeerDeps: Array.from(optionalPeerDeps),
   };
 }
 function collectHigherOrderDeps(
@@ -307,8 +323,8 @@ function collectHigherOrderDeps(
     throw new Error('collectHigherOrderDeps(): No dependencies field in package-lock root');
   }
 
-  const ret = new Set();
-  const visitedNodes = new Set();
+  const ret = new Set<string>();
+  const visitedNodes = new Set<string>();
   const verbose = options.verbose;
 
   function visitNode(node: any, parents: string | any[]) {

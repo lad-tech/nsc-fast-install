@@ -14,6 +14,7 @@ import {
   parseTsConfig,
 } from '../helpers';
 import { Timer } from '../Timer';
+import { PackageJsonLike } from '../types';
 
 const MAX_SHELL_COMMAND_LENGTH = 100000;
 async function main() {
@@ -86,7 +87,7 @@ async function main() {
     await execCmd(`rm -rf ${localNodeModulesDir}`);
     prepareTimer.end();
     scanTimer.start();
-    const { firstOrderDeps, higherOrderDeps } = collectDeps({
+    const { firstOrderDeps, higherOrderDeps, optionalPeerDeps } = collectDeps({
       entrypoint: preparedEntry,
       baseDir: outDir,
       packageLock,
@@ -96,7 +97,7 @@ async function main() {
       },
     });
     const packageJsonFile = path.join(cwd, 'package.json');
-    let packageJson;
+    let packageJson: PackageJsonLike;
 
     scanTimer.end();
     try {
@@ -119,7 +120,17 @@ async function main() {
       console.error(missingDeps.join('\n'));
       process.exit(1);
     }
-    const depsToCopy: string[] = [...firstOrderDeps, ...higherOrderDeps];
+
+    const missingOptionalDeps = optionalPeerDeps.filter(depName => !packageJsonDeps[depName]);
+    if (missingOptionalDeps.length) {
+      console.warn('The following peer deps are missing in package.json:');
+      console.error(missingOptionalDeps.join('\n'));
+    }
+    const depsToCopy: string[] = [
+      ...firstOrderDeps,
+      ...higherOrderDeps,
+      ...optionalPeerDeps.filter(depName => !missingOptionalDeps.includes(depName)),
+    ];
 
     if (depsToCopy.length > 0) {
       copyTimer.start();

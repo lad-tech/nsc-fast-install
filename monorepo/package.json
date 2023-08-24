@@ -2,8 +2,8 @@
   "name": "My Example monorepo",
   "version": "1.0.0",
   "description": "",
-
   "dependencies": {
+    "pg": "^8.11.2",
     "@lad-tech/nsc-toolkit": "^1.12.0",
     "@lad-tech/toolbelt": "^1.1.2",
     "@opentelemetry/api": "^1.1.0",
@@ -15,13 +15,14 @@
     "commander": "^9.4.1",
     "filing-cabinet": "^4.1.6",
     "gitignore-parser": "^0.0.2",
+    "inversify": "^6.0.1",
     "json-schema-to-typescript": "^11.0.2",
+    "mongodb": "^4.16.0",
     "nats": "^2.9.0",
     "precinct": "^11.0.5",
     "reflect-metadata": "^0.1.13",
-    "inversify": "^6.0.1",
-    "mongodb": "^4.16.0",
-    "ts-morph": "^17.0.1"
+    "ts-morph": "^17.0.1",
+    "typeorm": "^0.3.17"
   },
   "author": "Blynskyniki",
   "license": "ISC"

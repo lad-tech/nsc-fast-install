@@ -1,4 +1,5 @@
 import { container, DependencyType, Service } from '@lad-tech/nsc-toolkit';
+import { BaseRepositoryProvider } from 'ExampleService/BaseRepositoryProvider';
 import { TYPES } from 'ExampleService/inversion.types';
 import { AddEmails } from 'ExampleService/methods/AddEmails';
 import { DeleteEmails } from 'ExampleService/methods/DeleteEmails';
@@ -16,9 +17,9 @@ export async function main(broker?: NatsConnection) {
       servers: [configurator.getSettingFromEnv('NATS_HOST')],
       maxReconnectAttempts: -1,
     }));
-
   container.bind<Logger>(TYPES.Logger, DependencyType.CONSTANT, logger);
   container.bind<Configurator>(TYPES.Configurator, DependencyType.CONSTANT, configurator);
+  container.bind<BaseRepositoryProvider>(TYPES.BaseRepositoryProvider, DependencyType.ADAPTER, BaseRepositoryProvider);
   container.bind<EmailRepository>(
     TYPES.EmailsRepository,
     DependencyType.CONSTANT,

@@ -11,4 +11,8 @@ export type TsConfigLike = {
 
 export type PackageJsonLike = {
   main?: string;
+
+  peerDependencies?: Record<string, string>;
+  peerDependenciesMeta?: Record<string, { optional?: boolean }>;
+  dependencies?: Record<string, any>;
 };
