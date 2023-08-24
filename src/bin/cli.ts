@@ -22,9 +22,10 @@ async function main() {
     const program = new Command();
     program
       .description('Быстрая установка зависимостей для сборки сервисов в моно репозиториях')
-      .option('--entryPoint  <path>', 'Путь от корня проекта (services/ExampleService/index.ts)')
-      .option('--service  <path>', 'Путь от корня проекта до сервиса (services/ExampleService)')
+      .option('--entryPoint  <string>', 'Путь от корня проекта (services/ExampleService/index.ts)')
+      .option('--service  <string>', 'Путь от корня проекта до сервиса (services/ExampleService)')
       .option('--verbose <boolean>', 'Расширенные логи')
+      .option('--exclude <string>', 'Папки, которые нужно исключить через ","', 'frontend')
       .option('--tsconfig <string>', 'Название конфига для сборки');
 
     program.parse();
@@ -33,6 +34,7 @@ async function main() {
     if (!options.entryPoint && !options.service) {
       throw ' Use --entryPoint or --service for fast deps install';
     }
+    const excludeDirs: string[] = options.exclude ? options.exclude.split(',') : [];
 
     const verbose = options.verbose || false;
     const configName = options.tsconfig || 'tsconfig.json';
@@ -52,6 +54,12 @@ async function main() {
         workDir,
       });
     }
+    excludeDirs.forEach(dir => {
+      if (workDir.match(dir)) {
+        console.warn(`${dir} exclude. Finish`);
+        process.exit(0);
+      }
+    });
 
     const prepareTimer = new Timer('Prepare');
     const scanTimer = new Timer('Scan');
