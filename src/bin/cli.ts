@@ -48,18 +48,18 @@ async function main() {
     if (verbose) {
       console.log('cwd', cwd, 'workDir', workDir);
     }
-    if (!options.entryPoint) {
-      options.entryPoint = await findServiceEntry({
-        verbose,
-        workDir,
-      });
-    }
     excludeDirs.forEach(dir => {
       if (workDir.match(dir)) {
         console.warn(`${dir} exclude. Finish`);
         process.exit(0);
       }
     });
+    if (!options.entryPoint) {
+      options.entryPoint = await findServiceEntry({
+        verbose,
+        workDir,
+      });
+    }
 
     const prepareTimer = new Timer('Prepare');
     const scanTimer = new Timer('Scan');
