@@ -2,7 +2,7 @@
   "name": "settings",
   "version": "1.0.0",
   "description": "",
-  "main": "dist/ExampleService/start1.js",
+  "main": "dist/ExampleService/start.js",
   "scripts": {
     "test": "rm -rf ./dist && NODE_PATH=../ npx jest --coverage",
     "build": "rm -rf ./dist && NODE_PATH=../ npx tsc --preserveSymlinks",

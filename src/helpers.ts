@@ -43,18 +43,25 @@ export async function getOutDir(data: { tsConfig: TsConfigLike; workDir: string 
 
 export async function findOutDirEntry(data: { tsConfig: TsConfigLike; workDir: string; entryPoint: string }) {
   const { workDir, tsConfig, entryPoint } = data;
+  const baseName = path.basename(entryPoint).replace('ts', 'js');
+  const entryPointPrepared = path.resolve(path.dirname(entryPoint), baseName);
   if (tsConfig?.compilerOptions?.outDir) {
     let outDir = path.resolve(workDir, tsConfig.compilerOptions?.outDir);
+
     if (tsConfig?.compilerOptions?.baseUrl) {
       const b = path.resolve(workDir, tsConfig?.compilerOptions?.baseUrl);
       const c = path.normalize(path.relative(b, workDir));
       outDir = path.resolve(workDir, tsConfig.compilerOptions?.outDir, c);
     }
     await fs.access(outDir);
-    return path.resolve(outDir, path.basename(entryPoint).replace('ts', 'js'));
+    const relative = path.relative(outDir, entryPointPrepared);
+
+    return path.resolve(outDir, relative);
   }
-  return path.resolve(workDir, path.basename(entryPoint).replace('ts', 'js'));
+  const relative = path.relative(workDir, entryPointPrepared);
+  return path.resolve(workDir, relative);
 }
+
 const DEFAULT_ENTRY_POINTS = ['start.ts', 'service.ts', 'index.ts'];
 export async function findServiceEntry(data: { workDir: string; verbose: boolean }) {
   const { workDir, verbose } = data;
