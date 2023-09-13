@@ -41,20 +41,30 @@ export async function getOutDir(data: { tsConfig: TsConfigLike; workDir: string 
   }
 }
 
-export async function findOutDirEntry(data: { tsConfig: TsConfigLike; workDir: string; entryPoint: string }) {
-  const { workDir, tsConfig, entryPoint } = data;
+export async function findOutDirEntry(data: {
+  tsConfig: TsConfigLike;
+  workDir: string;
+  entryPoint: string;
+  verbose?: boolean;
+}) {
+  const { workDir, tsConfig, entryPoint, verbose } = data;
   const baseName = path.basename(entryPoint).replace('ts', 'js');
   const entryPointPrepared = path.resolve(path.dirname(entryPoint), baseName);
   if (tsConfig?.compilerOptions?.outDir) {
     let outDir = path.resolve(workDir, tsConfig.compilerOptions?.outDir);
-
+    if (verbose) {
+      console.log('FindOutDirEntry -> Using outDir', outDir);
+    }
     if (tsConfig?.compilerOptions?.baseUrl) {
       const b = path.resolve(workDir, tsConfig?.compilerOptions?.baseUrl);
       const c = path.normalize(path.relative(b, workDir));
       outDir = path.resolve(workDir, tsConfig.compilerOptions?.outDir, c);
+      if (verbose) {
+        console.log('FindOutDirEntry -> Using baseUrl', verbose);
+      }
     }
     await fs.access(outDir);
-    const relative = path.relative(outDir, entryPointPrepared);
+    const relative = path.resolve(outDir, baseName);
 
     return path.resolve(outDir, relative);
   }
@@ -164,21 +174,39 @@ function extractFileDeps(file: string, baseDir: string) {
 
         ast: precinct.ast,
       });
-    } catch {
-      // Do nothing
+    } catch (err) {
+      console.warn(err);
     }
 
     if (result && fss.existsSync(result)) {
       resolved.push(result);
     } else {
+      console.warn(`Could not resolve ${dep} in ${file}`);
+      if (dep.includes('/')) {
+        const firstLevelDep = dep.split('/')[0];
+        console.warn(`Check higher conditional exports ${firstLevelDep}`);
+        try {
+          result = cabinet({
+            partial: firstLevelDep,
+            filename: file,
+            directory: baseDir,
+            ast: precinct.ast,
+          });
+        } catch (err) {
+          console.warn(err);
+        }
+
+        if (result && fss.existsSync(result)) {
+          resolved.push(result);
+          continue;
+        }
+      }
       console.log({
         partial: dep,
         filename: file,
         directory: baseDir,
-
         result,
       });
-      console.warn(`Could not resolve ${dep} in ${file}`);
       notFound.push(dep);
     }
   }

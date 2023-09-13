@@ -81,7 +81,7 @@ async function main() {
       throw 'Dist dir not found. Did you forget to build?';
     }
 
-    const preparedEntry = await findOutDirEntry({ workDir, tsConfig, entryPoint: options.entryPoint });
+    const preparedEntry = await findOutDirEntry({ workDir, tsConfig, entryPoint: options.entryPoint, verbose });
 
     console.log(`Building node_modules in ${outDir}`);
     if (verbose) {

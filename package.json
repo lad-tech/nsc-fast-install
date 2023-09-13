@@ -13,11 +13,13 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "fastInstall": "cd monorepo && npx ts-node ../src/bin/cli.ts --entryPoint services/ExampleService/start.ts --verbose true",
     "fastInstall2": "cd monorepo && npx ts-node ../src/bin/cli.ts --service services/ExampleService --verbose true",
+    "bosco": "cd bosco && npx ts-node ../src/bin/cli.ts --service services/notification-service --verbose true",
     "fastInstall3": "cd monorepo && npx ts-node ../src/bin/cli.ts --service services/ExampleService --exclude ExampleService",
     "semantic-release": "semantic-release"
   },
   "bin": {
-    "fast-deps-install": "./dist/bin/cli.js"
+    "fast-deps-install": "./dist/bin/cli.js",
+    "nsc-fast-install": "./dist/bin/cli.js"
   },
   "devDependencies": {
     "@commitlint/cli": "^17.2.0",

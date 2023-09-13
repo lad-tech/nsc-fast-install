@@ -13,7 +13,7 @@
 **/.LSOverride
 test.report.xml
 **/storage/
-
+bosco/**/*
 local.run/envs/*.env
 local.run/logs
 
