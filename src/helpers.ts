@@ -5,7 +5,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 // @ts-ignore
 import * as precinct from 'precinct';
-import { PackageJsonLike, PackageLockLike, TsConfigLike } from './types';
+import { CollectOptions, isPackageLockV3, PackageJsonLike, PackageLock, TsConfigLike } from './types';
 
 export interface ParseTsConfigParams {
   workDir: string;
@@ -313,7 +313,7 @@ function collectFirstOrderDeps(data: { entrypoint: string; baseDir: string; cwd:
 export function collectDeps(data: {
   entrypoint: string;
   baseDir: string;
-  packageLock: PackageLockLike;
+  packageLock: PackageLock;
   cwd: string;
   options: { verbose: boolean };
 }) {
@@ -346,79 +346,72 @@ export function collectDeps(data: {
 }
 function collectHigherOrderDeps(
   firstOrderDeps: Set<string>,
-  packageLock: PackageLockLike,
+  packageLock: PackageLock,
   cwd: string,
-  options: { verbose: any },
+  options: CollectOptions,
 ) {
-  if (!packageLock) {
-    throw new Error('collectHigherOrderDeps(): No package-lock');
-  }
+  const isV3 = isPackageLockV3(packageLock);
 
-  if (firstOrderDeps.size > 0 && !packageLock.dependencies) {
-    throw new Error('collectHigherOrderDeps(): No dependencies field in package-lock root');
+  const hasRootDeps = isPackageLockV3(packageLock)
+    ? Boolean(packageLock.packages?.['']?.dependencies)
+    : Boolean(packageLock.dependencies);
+
+  if (firstOrderDeps.size > 0 && !hasRootDeps) {
+    throw new Error('collectHigherOrderDeps(): No dependencies found in package-lock root');
   }
 
   const ret = new Set<string>();
-  const visitedNodes = new Set<string>();
-  const verbose = options.verbose;
+  const visited = new Set<string>();
+  const verbose = options?.verbose;
 
-  function visitNode(node: any, parents: string | any[]) {
-    if (visitedNodes.has(node)) {
-      return;
+  function visitPackage(depName: string, parents: string[] = []) {
+    if (visited.has(depName)) return;
+    visited.add(depName);
+
+    let requires: Record<string, any> = {};
+
+    if (isV3) {
+      const pkgPath = `node_modules/${depName}`;
+      const node = packageLock.packages?.[pkgPath];
+
+      if (!node) {
+        if (verbose) {
+          console.warn(`Dependency "${depName}" not found in package-lock under path ${pkgPath}`);
+        }
+        return;
+      }
+
+      requires = node.dependencies || {};
+    } else {
+      // Для v1/v2 — просто ищем в dependencies
+      const node = packageLock.dependencies?.[depName];
+
+      if (!node) {
+        if (verbose) {
+          console.warn(`Dependency "${depName}" not found in package-lock.dependencies`);
+        }
+        return;
+      }
+
+      requires = node.requires || node.dependencies || {};
     }
 
-    visitedNodes.add(node);
+    for (const requiredDep of Object.keys(requires)) {
+      const isFirstOrder = firstOrderDeps.has(requiredDep);
 
-    const requires = Object.keys(node.requires || {});
-    const deps = node.dependencies || {};
-
-    for (const require of requires) {
-      let nodeWithDep = null;
-      let nextParents: any = null;
-
-      if (deps[require]) {
-        nodeWithDep = node;
-        nextParents = [node, ...parents];
-      } else {
-        for (let i = 0; i < parents.length; i++) {
-          const parent = parents[i];
-          const parentDeps = parent.dependencies || {};
-
-          if (parentDeps[require]) {
-            nodeWithDep = parent;
-            nextParents = parents.slice(i);
-            break;
-          }
-        }
-      }
-
-      if (!nodeWithDep) {
-        throw new Error(
-          `collectHigherOrderDeps(): cannot find where "${require}" is installed. ` +
-            'Looks like package-lock.json is corrupted.',
-        );
-      }
-
-      if (nodeWithDep === packageLock && !firstOrderDeps.has(require)) {
+      if (!isFirstOrder) {
+        ret.add(requiredDep);
         if (verbose) {
-          console.log(`Found higher order dep ${require}`);
+          console.log(`Found higher order dep: ${requiredDep}`);
         }
-
-        ret.add(require);
       }
 
-      visitNode(nodeWithDep.dependencies[require], nextParents);
+      visitPackage(requiredDep, [...parents, depName]);
     }
   }
 
   for (const dep of firstOrderDeps) {
-    const node = packageLock.dependencies[dep];
-
-    if (!node) {
-      throw new Error(`collectHigherOrderDeps(): Dependency description for ${dep} not found in package-lock`);
-    }
-
-    visitNode(node, [packageLock]);
+    visitPackage(dep);
   }
 
   return Array.from(ret);
