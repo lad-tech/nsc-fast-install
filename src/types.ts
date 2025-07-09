@@ -1,16 +1,20 @@
 export type TsConfigLike = {
-  compilerOptions?: {
-    outDir?: string;
-    baseUrl?: string;
+  readonly compilerOptions?: {
+    readonly outDir?: string;
+    readonly baseUrl?: string;
   };
 };
 
 export type PackageJsonLike = {
-  main?: string;
-
-  peerDependencies?: Record<string, string>;
-  peerDependenciesMeta?: Record<string, { optional?: boolean }>;
-  dependencies?: Record<string, any>;
+  readonly main?: string;
+  readonly dependencies?: Record<string, string>;
+  readonly peerDependencies?: Record<string, string>;
+  readonly peerDependenciesMeta?: Record<
+    string,
+    {
+      readonly optional?: boolean;
+    }
+  >;
 };
 
 export type PackageLockV3 = {

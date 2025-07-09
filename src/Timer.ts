@@ -1,29 +1,40 @@
 export class Timer {
-  private _name: string;
-  private _start: number | null;
-  private _end: number | null;
-  private _elapsed: number | null;
+  private name: string;
+  private startTime?: number;
+  private endTime?: number;
+
   constructor(name: string) {
-    this._name = name;
-    this._start = null;
-    this._end = null;
-    this._elapsed = null;
+    this.name = name;
   }
 
-  start() {
-    this._start = Date.now();
+  start(): void {
+    this.startTime = Date.now();
   }
 
-  end() {
-    this._end = Date.now();
-    if (this._start) {
-      this._elapsed = this._end - this._start;
+  end(): void {
+    if (this.startTime === undefined) {
+      console.warn(`[Timer "${this.name}"] end() called before start()`);
+      return;
     }
+    this.endTime = Date.now();
   }
 
-  print() {
-    if (this._elapsed !== null) {
-      console.log(`${this._name}: ${this._elapsed} ms`);
+  get elapsed(): number | null {
+    if (this.startTime !== undefined && this.endTime !== undefined) {
+      return this.endTime - this.startTime;
+    }
+    return null;
+  }
+
+  print(): void {
+    const ms = this.elapsed;
+    if (ms !== null) {
+      const msg = ms > 1000
+        ? `${this.name}: ${(ms / 1000).toFixed(2)} s`
+        : `${this.name}: ${ms} ms`;
+      console.log(msg);
+    } else {
+      console.log(`${this.name}: timer not completed`);
     }
   }
 }

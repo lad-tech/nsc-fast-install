@@ -3,15 +3,22 @@ import cabinet from 'filing-cabinet';
 import * as fss from 'fs';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-// @ts-ignore
-import * as precinct from 'precinct';
-import { CollectOptions, isPackageLockV3, PackageJsonLike, PackageLock, TsConfigLike } from './types';
+import precinct from 'precinct';
+
+import {
+  CollectOptions,
+  isPackageLockV3,
+  PackageJsonLike,
+  PackageLock,
+  TsConfigLike,
+} from './types';
 
 export interface ParseTsConfigParams {
   workDir: string;
   configName: string;
 }
 
+/** Загружает и парсит tsconfig.json */
 export async function parseTsConfig(data: ParseTsConfigParams): Promise<TsConfigLike> {
   const { workDir, configName } = data;
   const list = await fs.readdir(workDir);
@@ -20,145 +27,128 @@ export async function parseTsConfig(data: ParseTsConfigParams): Promise<TsConfig
   }
   try {
     return (await import(path.resolve(workDir, configName))) as TsConfigLike;
-  } catch (e) {
-    if (e instanceof Error) {
-      throw new Error(`tsconfig.json parsing error. Use --tsconfig for custom config name \n ${e.message || ''}`);
-    }
-    throw new Error(`tsconfig.json parsing error. Use --tsconfig for custom config name`);
+  } catch (e: any) {
+    throw new Error(`tsconfig.json parsing error: ${e.message}`);
   }
 }
 
-export async function getOutDir(data: { tsConfig: TsConfigLike; workDir: string }) {
-  if (data.tsConfig.compilerOptions?.outDir) {
-    try {
-      const outDir = path.resolve(data.workDir, data.tsConfig.compilerOptions?.outDir);
+/** Определяет outDir из tsconfig и проверяет его существование */
+export async function getOutDir(data: { tsConfig: TsConfigLike; workDir: string }): Promise<string> {
+  const outDir = data.tsConfig.compilerOptions?.outDir;
+  if (!outDir) throw new Error('No outDir specified in tsconfig.json');
 
-      await fs.access(outDir);
-      return outDir;
-    } catch (err: any) {
-      throw 'Dist dir not found. Did you forget to build?';
-    }
+  const fullPath = path.resolve(data.workDir, outDir);
+  try {
+    await fs.access(fullPath);
+    return fullPath;
+  } catch {
+    throw new Error(`Dist dir not found at ${fullPath}. Did you forget to build?`);
   }
 }
 
+/** Возвращает путь к js-файлу entrypoint-а внутри outDir */
 export async function findOutDirEntry(data: {
   tsConfig: TsConfigLike;
   workDir: string;
   entryPoint: string;
   verbose?: boolean;
-}) {
+}): Promise<string> {
   const { workDir, tsConfig, entryPoint, verbose } = data;
-  const baseName = path.basename(entryPoint).replace('ts', 'js');
-  const entryPointPrepared = path.resolve(path.dirname(entryPoint), baseName);
-  if (tsConfig?.compilerOptions?.outDir) {
-    let outDir = path.resolve(workDir, tsConfig.compilerOptions?.outDir);
-    if (verbose) {
-      console.log('FindOutDirEntry -> Using outDir', outDir);
-    }
-    if (tsConfig?.compilerOptions?.baseUrl) {
-      const b = path.resolve(workDir, tsConfig?.compilerOptions?.baseUrl);
-      const c = path.normalize(path.relative(b, workDir));
-      outDir = path.resolve(workDir, tsConfig.compilerOptions?.outDir, c);
-      if (verbose) {
-        console.log('FindOutDirEntry -> Using baseUrl', verbose);
-      }
-    }
-    await fs.access(outDir);
-    const relative = path.resolve(outDir, baseName);
+  const baseName = path.basename(entryPoint).replace(/\.ts$/, '.js');
+  let outDir = path.resolve(workDir, tsConfig.compilerOptions?.outDir || 'dist');
 
-    return path.resolve(outDir, relative);
+  if (tsConfig.compilerOptions?.baseUrl) {
+    const rel = path.relative(path.resolve(workDir, tsConfig.compilerOptions.baseUrl), workDir);
+    outDir = path.resolve(outDir, rel);
+    if (verbose) console.log('[findOutDirEntry] adjusted outDir:', outDir);
   }
-  const relative = path.relative(workDir, entryPointPrepared);
-  return path.resolve(workDir, relative);
+
+  await fs.access(outDir);
+  return path.resolve(outDir, baseName);
 }
 
 const DEFAULT_ENTRY_POINTS = ['start.ts', 'service.ts', 'index.ts'];
-export async function findServiceEntry(data: { workDir: string; verbose: boolean }) {
+
+/** Автоматически находит entrypoint сервиса */
+export async function findServiceEntry(data: { workDir: string; verbose: boolean }): Promise<string> {
   const { workDir, verbose } = data;
   const list = await fs.readdir(workDir);
-  if (list.includes('package.json')) {
-    if (verbose) console.log('Search entry with package.json main');
-    let p = undefined;
-    try {
-      p = (await import(path.resolve(workDir, 'package.json'))) as PackageJsonLike;
 
-      if (p && p?.main) {
-        const entry = path.resolve(workDir, p?.main);
+  if (list.includes('package.json')) {
+    try {
+      const pkg = (await import(path.resolve(workDir, 'package.json'))) as PackageJsonLike;
+      if (pkg.main) {
+        const entry = path.resolve(workDir, pkg.main);
         await fs.access(entry);
-        console.info(`Entry for package.json  found => ${entry}`);
+        if (verbose) console.log(`Entry from package.json found: ${entry}`);
         return entry;
       }
-    } catch (e) {}
-  }
-  for (const itemEntry of DEFAULT_ENTRY_POINTS) {
-    if (list.includes(itemEntry)) {
-      try {
-        const entry = path.resolve(workDir, itemEntry);
-        await fs.access(entry);
-        console.info(`Entry for package.json  found => ${entry}`);
-        return entry;
-      } catch (e) {}
+    } catch (err) {
+      if (verbose) console.warn('Failed to resolve main from package.json:', err);
     }
   }
 
-  throw new Error(`Entry for ${workDir} not found. Use --entryPoint `);
+  for (const file of DEFAULT_ENTRY_POINTS) {
+    const entry = path.resolve(workDir, file);
+    try {
+      await fs.access(entry);
+      if (verbose) console.log(`Fallback entry found: ${entry}`);
+      return entry;
+    } catch {
+      if (verbose) console.log(`Checked entry: ${entry} - not found`);
+
+    }
+  }
+
+  throw new Error(`Entry for ${workDir} not found. Use --entryPoint explicitly.`);
 }
 
-export async function parsePackageLock(dir: string) {
+/** Парсит package-lock.json */
+export async function parsePackageLock(dir: string): Promise<PackageLock> {
   const packageLockFile = path.join(dir, 'package-lock.json');
-  let packageLock;
-
   try {
-    packageLock = await import(packageLockFile);
+    const lock = await import(packageLockFile);
     console.log(`Using package-lock ${packageLockFile}`);
-    return packageLock;
+    return lock;
   } catch {
-    console.error(`package-lock.json not found in ${dir}`);
-    process.exit(1);
+    throw new Error(`package-lock.json not found in ${dir}`);
   }
 }
 
+/** Выполняет shell-команду */
 export async function execCmd(
   command: string,
   options?: {
-    encoding: BufferEncoding;
+    encoding?: BufferEncoding;
   } & ExecOptions,
-) {
+): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    const callback = (error: ExecException | null, stdout: string, stderr: string) => {
-      if (error) {
-        reject(error);
-      } else {
-        resolve();
-      }
-    };
-
-    if (options) {
-      exec(command, options, callback);
-    } else {
-      exec(command, callback);
-    }
+    exec(command, options ?? {}, (error: ExecException | null) => {
+      if (error) reject(error);
+      else resolve();
+    });
   });
 }
-export function parseDepName(dep: string) {
-  const [namespace, name] = dep.split('/');
 
+/** Разбирает имя зависимости на namespace и name */
+export function parseDepName(dep: string): { namespace: string | null; name: string } {
+  const [namespace, name] = dep.split('/');
   return {
     namespace: name ? namespace : null,
-    name: name ? name : namespace,
+    name: name ?? namespace,
   };
 }
 
+/** Извлекает список импортов из файла и пытается их разрешить */
 function extractFileDeps(file: string, baseDir: string) {
   const resolved: string[] = [];
   const notFound: string[] = [];
   let dependencies: string[];
 
   try {
-    dependencies = precinct.paperwork(file, {
-      type: 'commonjs',
-      includeCore: false,
-    });
+    dependencies = precinct.paperwork(file, { includeCore: false, });
+
+
   } catch (err) {
     console.log(`Error getting deps in ${file}`, err);
     return { resolved, notFound };
@@ -171,145 +161,22 @@ function extractFileDeps(file: string, baseDir: string) {
         partial: dep,
         filename: file,
         directory: baseDir,
-
-        ast: precinct.ast,
       });
     } catch (err) {
-      console.warn(err);
+      console.warn(`Failed to resolve ${dep} in ${file}:`, err);
     }
 
     if (result && fss.existsSync(result)) {
       resolved.push(result);
     } else {
-      console.warn(`Could not resolve ${dep} in ${file}`);
-      if (dep.includes('/')) {
-        const firstLevelDep = dep.split('/')[0];
-        console.warn(`Check higher conditional exports ${firstLevelDep}`);
-        try {
-          result = cabinet({
-            partial: firstLevelDep,
-            filename: file,
-            directory: baseDir,
-            ast: precinct.ast,
-          });
-        } catch (err) {
-          console.warn(err);
-        }
-
-        if (result && fss.existsSync(result)) {
-          resolved.push(result);
-          continue;
-        }
-      }
-      console.log({
-        partial: dep,
-        filename: file,
-        directory: baseDir,
-        result,
-      });
       notFound.push(dep);
     }
   }
 
   return { resolved, notFound };
 }
-function count(array: any, predicate: { (part: any): boolean; (arg0: any): any }) {
-  let ret = 0;
 
-  for (const item of array) {
-    if (predicate(item)) {
-      ret += 1;
-    }
-  }
-
-  return ret;
-}
-function extractDepName(parts: { [x: string]: any }, nodeModulesIdx: number) {
-  let depName = parts[nodeModulesIdx + 1];
-
-  if (!depName) {
-    throw new Error('Some shit happened');
-  }
-
-  if (depName.startsWith('@')) {
-    depName += `/${parts[nodeModulesIdx + 2]}`;
-  }
-
-  return depName;
-}
-function collectPeerDeps(firstOrderDeps: Set<string>, cwd: string) {
-  const requiredPeerDeps = new Set<string>();
-  const optionalPeerDeps = new Set<string>();
-
-  for (const dep of firstOrderDeps) {
-    const packageJsonFile = path.join(cwd, 'node_modules', dep, 'package.json');
-    let packageJson: PackageJsonLike;
-    try {
-      packageJson = require(packageJsonFile) || {};
-    } catch {
-      packageJson = {
-        peerDependencies: {},
-        peerDependenciesMeta: {},
-      };
-      throw new Error(`Error reading package.json of first order dep ${dep}`);
-    }
-
-    for (const depName in packageJson.peerDependencies) {
-      if (packageJson?.peerDependenciesMeta?.[depName]?.optional === true) {
-        optionalPeerDeps.add(depName);
-      } else {
-        requiredPeerDeps.add(depName);
-      }
-    }
-  }
-
-  return { requiredPeerDeps, optionalPeerDeps };
-}
-function collectFirstOrderDeps(data: { entrypoint: string; baseDir: string; cwd: string }) {
-  const { cwd, baseDir, entrypoint } = data;
-  const requiredDeps = new Set<string>();
-  const visited = new Set();
-  const nonExistent = new Set();
-
-  function visitFile(file: string) {
-    const { resolved, notFound } = extractFileDeps(file, baseDir);
-
-    for (const dep of notFound) {
-      nonExistent.add(dep);
-    }
-
-    for (const dep of resolved) {
-      if (visited.has(dep)) {
-        continue;
-      }
-
-      visited.add(dep);
-
-      const parts = dep.split('/');
-      const nodeModulesIdx = parts.indexOf('node_modules');
-      const isExternal = nodeModulesIdx !== -1;
-
-      if (isExternal) {
-        const depth = count(parts, part => part === 'node_modules');
-
-        if (depth === 1) {
-          const depName = extractDepName(parts, nodeModulesIdx);
-
-          requiredDeps.add(depName);
-        }
-      } else {
-        visitFile(dep);
-      }
-    }
-  }
-
-  visitFile(entrypoint);
-
-  const { requiredPeerDeps, optionalPeerDeps } = collectPeerDeps(requiredDeps, cwd);
-  requiredPeerDeps.forEach(peerDep => requiredDeps.add(peerDep));
-
-  return { resolved: requiredDeps, nonExistent, optionalPeerDeps };
-}
+/** Собирает зависимости (первичные, вложенные и peer-опциональные) */
 export function collectDeps(data: {
   entrypoint: string;
   baseDir: string;
@@ -317,33 +184,83 @@ export function collectDeps(data: {
   cwd: string;
   options: { verbose: boolean };
 }) {
-  const { cwd, packageLock, options, baseDir, entrypoint } = data;
-  const {
-    resolved: firstOrderDeps,
-    nonExistent,
-    optionalPeerDeps,
-  } = collectFirstOrderDeps({
-    entrypoint,
-    baseDir,
-    cwd,
-  });
+  const { entrypoint, baseDir, packageLock, cwd, options } = data;
 
-  if (nonExistent.size > 0) {
-    throw new Error(`Failed to resolve dependencies:\n${Array.from(nonExistent).join('\n')}`);
+  const resolved = new Set<string>();
+  const notResolved = new Set<string>();
+  const visited = new Set<string>();
+
+  function visit(file: string) {
+    const { resolved: localResolved, notFound } = extractFileDeps(file, baseDir);
+
+    for (const missing of notFound) notResolved.add(missing);
+
+    for (const dep of localResolved) {
+      if (visited.has(dep)) continue;
+      visited.add(dep);
+
+      const parts = dep.split('/');
+      const nodeModulesIdx = parts.indexOf('node_modules');
+      const isExternal = nodeModulesIdx !== -1;
+
+      if (isExternal) {
+        const depth = parts.filter(p => p === 'node_modules').length;
+        if (depth === 1) {
+          const depName = parts[nodeModulesIdx + 1]?.startsWith('@')
+            ? `${parts[nodeModulesIdx + 1]}/${parts[nodeModulesIdx + 2]}`
+            : parts[nodeModulesIdx + 1];
+          resolved.add(depName);
+        }
+      } else {
+        visit(dep);
+      }
+    }
   }
 
-  const higherOrderDeps = collectHigherOrderDeps(firstOrderDeps, packageLock, cwd, options);
+  visit(entrypoint);
 
-  console.log(
-    `Found ${firstOrderDeps.size} first order deps and ${higherOrderDeps.length} higher order deps and ${optionalPeerDeps.size} optional peer deps`,
-  );
+  const { requiredPeerDeps, optionalPeerDeps } = collectPeerDeps(resolved, cwd);
+  requiredPeerDeps.forEach(d => resolved.add(d));
+
+  if (notResolved.size) {
+    throw new Error(`Unresolved imports:\n${Array.from(notResolved).join('\n')}`);
+  }
+
+  const higherOrderDeps = collectHigherOrderDeps(resolved, packageLock, cwd, options);
 
   return {
-    firstOrderDeps: Array.from(firstOrderDeps),
+    firstOrderDeps: Array.from(resolved),
     higherOrderDeps: Array.from(higherOrderDeps),
     optionalPeerDeps: Array.from(optionalPeerDeps),
   };
 }
+
+function collectPeerDeps(firstOrderDeps: Set<string>, cwd: string) {
+  const required = new Set<string>();
+  const optional = new Set<string>();
+
+  for (const dep of firstOrderDeps) {
+    const pkgFile = path.join(cwd, 'node_modules', dep, 'package.json');
+    let json: PackageJsonLike;
+
+    try {
+      json = require(pkgFile);
+    } catch {
+      continue;
+    }
+
+    const peers = json.peerDependencies || {};
+    const meta = json.peerDependenciesMeta || {};
+
+    for (const key of Object.keys(peers)) {
+      if (meta[key]?.optional) optional.add(key);
+      else required.add(key);
+    }
+  }
+
+  return { requiredPeerDeps: required, optionalPeerDeps: optional };
+}
+
 function collectHigherOrderDeps(
   firstOrderDeps: Set<string>,
   packageLock: PackageLock,
@@ -351,68 +268,37 @@ function collectHigherOrderDeps(
   options: CollectOptions,
 ) {
   const isV3 = isPackageLockV3(packageLock);
-
-  const hasRootDeps = isPackageLockV3(packageLock)
-    ? Boolean(packageLock.packages?.['']?.dependencies)
-    : Boolean(packageLock.dependencies);
-
-  if (firstOrderDeps.size > 0 && !hasRootDeps) {
-    throw new Error('collectHigherOrderDeps(): No dependencies found in package-lock root');
-  }
-
-  const ret = new Set<string>();
+  const result = new Set<string>();
   const visited = new Set<string>();
-  const verbose = options?.verbose;
 
-  function visitPackage(depName: string, parents: string[] = []) {
-    if (visited.has(depName)) return;
-    visited.add(depName);
+  function visit(name: string) {
+    if (visited.has(name)) return;
+    visited.add(name);
 
-    let requires: Record<string, any> = {};
+    let requires: Record<string, unknown> = {};
 
     if (isV3) {
-      const pkgPath = `node_modules/${depName}`;
-      const node = packageLock.packages?.[pkgPath];
-
-      if (!node) {
-        if (verbose) {
-          console.warn(`Dependency "${depName}" not found in package-lock under path ${pkgPath}`);
-        }
-        return;
-      }
-
+      const node = packageLock.packages?.[`node_modules/${name}`];
+      if (!node) return;
       requires = node.dependencies || {};
     } else {
-      // Для v1/v2 — просто ищем в dependencies
-      const node = packageLock.dependencies?.[depName];
-
-      if (!node) {
-        if (verbose) {
-          console.warn(`Dependency "${depName}" not found in package-lock.dependencies`);
-        }
-        return;
-      }
-
+      const node = packageLock.dependencies?.[name];
+      if (!node) return;
       requires = node.requires || node.dependencies || {};
     }
 
-    for (const requiredDep of Object.keys(requires)) {
-      const isFirstOrder = firstOrderDeps.has(requiredDep);
-
-      if (!isFirstOrder) {
-        ret.add(requiredDep);
-        if (verbose) {
-          console.log(`Found higher order dep: ${requiredDep}`);
-        }
+    for (const dep of Object.keys(requires)) {
+      if (!firstOrderDeps.has(dep)) {
+        result.add(dep);
+        if (options.verbose) console.log(`↳ higher-order dep: ${dep}`);
       }
-
-      visitPackage(requiredDep, [...parents, depName]);
+      visit(dep);
     }
   }
 
   for (const dep of firstOrderDeps) {
-    visitPackage(dep);
+    visit(dep);
   }
 
-  return Array.from(ret);
+  return result;
 }

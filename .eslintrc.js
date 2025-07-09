@@ -92,6 +92,7 @@ module.exports = {
     ],
     'no-prototype-builtins': [1],
     '@typescript-eslint/no-non-null-assertion': [1],
+    '@typescript-eslint/no-var-requires':[0]
   },
   settings: {
     'import/resolver': {

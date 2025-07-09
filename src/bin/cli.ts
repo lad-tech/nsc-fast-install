@@ -1,11 +1,10 @@
-#! /usr/bin/env node
+#!/usr/bin/env node
 
 import { Command } from 'commander';
-import * as fs from 'fs';
+import * as fs from 'fs/promises';
 import * as path from 'path';
 import {
   collectDeps,
-  execCmd,
   findOutDirEntry,
   findServiceEntry,
   getOutDir,
@@ -16,191 +15,129 @@ import {
 import { Timer } from '../Timer';
 import { PackageJsonLike } from '../types';
 
-const MAX_SHELL_COMMAND_LENGTH = 100000;
 async function main() {
-  try {
-    const program = new Command();
-    program
-      .description('Быстрая установка зависимостей для сборки сервисов в моно репозиториях')
-      .option('--entryPoint  <string>', 'Путь от корня проекта (services/ExampleService/index.ts)')
-      .option('--service  <string>', 'Путь от корня проекта до сервиса (services/ExampleService)')
-      .option('--verbose <boolean>', 'Расширенные логи')
-      .option('--exclude <string>', 'Папки, которые нужно исключить через ","', 'frontend')
-      .option('--tsconfig <string>', 'Название конфига для сборки');
+  const program = new Command();
+  program
+    .description('Быстрая установка зависимостей для сборки сервисов в моно-репозитории')
+    .option('--entryPoint <string>', 'Точка входа (например, services/AuthService/start.ts)')
+    .option('--service <string>', 'Папка сервиса (например, services/AuthService)')
+    .option('--output <string>', 'Папка для node_modules (по умолчанию — dist)', '')
+    .option('--verbose', 'Вывод логов', false)
+    .option('--dryRun', 'Не выполнять копирование, только лог', false)
+    .option('--exclude <string>', 'Папки для исключения (через запятую)', 'frontend')
+    .option('--tsconfig <string>', 'Название tsconfig файла', 'tsconfig.json')
+    .showHelpAfterError();
 
-    program.parse();
+  program.parse();
+  const options = program.opts();
 
-    const options = program.opts();
-    if (!options.entryPoint && !options.service) {
-      throw ' Use --entryPoint or --service for fast deps install';
-    }
-    const excludeDirs: string[] = options.exclude ? options.exclude.split(',') : [];
+  if (!options.entryPoint && !options.service) {
+    throw new Error('Укажите --entryPoint или --service');
+  }
 
-    const verbose = options.verbose || false;
-    const configName = options.tsconfig || 'tsconfig.json';
-    let workDir = '';
-    if (options.entryPoint) {
-      workDir = path.dirname(path.resolve(options.entryPoint));
-    } else {
-      workDir = path.resolve(options.service);
-    }
-    const cwd = process.cwd();
-    if (verbose) {
-      console.log('cwd', cwd, 'workDir', workDir);
-    }
-    excludeDirs.forEach(dir => {
-      if (workDir.match(dir)) {
-        console.warn(`${dir} exclude. Finish`);
-        process.exit(0);
-      }
-    });
-    if (!options.entryPoint) {
-      options.entryPoint = await findServiceEntry({
-        verbose,
-        workDir,
-      });
-    }
+  const excludeDirs: string[] = options.exclude.split(',');
+  const cwd = process.cwd();
+  const workDir = path.resolve(options.entryPoint ? path.dirname(options.entryPoint) : options.service);
 
-    const prepareTimer = new Timer('Prepare');
-    const scanTimer = new Timer('Scan');
-    const copyTimer = new Timer('Copy');
-    const totalTimer = new Timer('TOTAL');
+  if (excludeDirs.some((dir) => workDir.includes(dir))) {
+    console.warn(`Каталог ${workDir} исключён через --exclude`);
+    process.exit(0);
+  }
 
-    totalTimer.start();
-    prepareTimer.start();
+  const entryPoint = options.entryPoint || (await findServiceEntry({ workDir, verbose: options.verbose }));
+  process.chdir(workDir);
 
-    process.chdir(workDir);
+  const totalTimer = new Timer('TOTAL');
+  const prepareTimer = new Timer('Prepare');
+  const scanTimer = new Timer('Scan');
+  const copyTimer = new Timer('Copy');
 
-    const tsConfig = await parseTsConfig({
-      workDir,
-      configName,
-    });
+  totalTimer.start();
+  prepareTimer.start();
 
-    const outDir = await getOutDir({ workDir, tsConfig });
-    if (!outDir) {
-      throw 'Dist dir not found. Did you forget to build?';
-    }
+  const tsConfig = await parseTsConfig({ workDir, configName: options.tsconfig });
+  const outDir = await getOutDir({ workDir, tsConfig });
 
-    const preparedEntry = await findOutDirEntry({ workDir, tsConfig, entryPoint: options.entryPoint, verbose });
+  const preparedEntry = await findOutDirEntry({ workDir, tsConfig, entryPoint, verbose: options.verbose });
+  const targetNodeModules = path.resolve(options.output || outDir, 'node_modules');
+  const globalNodeModules = path.join(cwd, 'node_modules');
 
-    console.log(`Building node_modules in ${outDir}`);
-    if (verbose) {
-      console.log({ cwd, workDir, outDir, preparedEntry });
-    }
+  if (options.verbose) {
+    console.log({ cwd, workDir, outDir, preparedEntry, targetNodeModules });
+  }
 
-    const packageLock = await parsePackageLock(cwd);
-    const globalNodeModulesDir = path.join(cwd, 'node_modules');
-    const localNodeModulesDir = path.join(outDir, 'node_modules');
+  await fs.rm(targetNodeModules, { recursive: true, force: true }).catch((err) => {
+    if (options.verbose) console.warn(`Ошибка удаления ${targetNodeModules}:`, err.message);
+  });
+  await fs.mkdir(targetNodeModules, { recursive: true });
 
-    await execCmd(`rm -rf ${localNodeModulesDir}`);
-    prepareTimer.end();
-    scanTimer.start();
-    const { firstOrderDeps, higherOrderDeps, optionalPeerDeps } = collectDeps({
-      entrypoint: preparedEntry,
-      baseDir: outDir,
-      packageLock,
-      cwd,
-      options: {
-        verbose,
-      },
-    });
-    const packageJsonFile = path.join(cwd, 'package.json');
-    let packageJson: PackageJsonLike;
+  prepareTimer.end();
+  scanTimer.start();
 
-    scanTimer.end();
-    try {
-      packageJson = require(packageJsonFile);
-    } catch {
-      console.error(`Error loading package.json in ${cwd}`);
-      process.exit(1);
-    }
-    const packageJsonDeps = packageJson.dependencies || {};
-    const missingDeps: string[] = [];
+  const packageLock = await parsePackageLock(cwd);
+  const deps = collectDeps({
+    entrypoint: preparedEntry,
+    baseDir: outDir,
+    packageLock,
+    cwd,
+    options: { verbose: options.verbose },
+  });
 
-    for (const dep of firstOrderDeps) {
-      if (!packageJsonDeps[dep]) {
-        missingDeps.push(dep);
-      }
-    }
+  const pkgPath = path.join(cwd, 'package.json');
+  const pkgRaw = await fs.readFile(pkgPath, 'utf-8');
+  const pkg: PackageJsonLike = JSON.parse(pkgRaw);
+  const depsInPkg = pkg.dependencies || {};
 
-    if (missingDeps.length > 0) {
-      console.error('The following deps are missing in package.json:');
-      console.error(missingDeps.join('\n'));
-      process.exit(1);
-    }
-
-    const missingOptionalDeps = optionalPeerDeps.filter(depName => !packageJsonDeps[depName]);
-    if (missingOptionalDeps.length) {
-      console.warn('The following peer deps are missing in package.json:');
-      console.error(missingOptionalDeps.join('\n'));
-    }
-    const depsToCopy: string[] = [
-      ...firstOrderDeps,
-      ...higherOrderDeps,
-      ...optionalPeerDeps.filter(depName => !missingOptionalDeps.includes(depName)),
-    ];
-
-    if (depsToCopy.length > 0) {
-      copyTimer.start();
-      await fs.promises.mkdir(localNodeModulesDir);
-
-      const namespaceDirs = new Set<string>();
-
-      for (const dep of depsToCopy) {
-        const { namespace } = parseDepName(dep);
-
-        if (namespace) {
-          namespaceDirs.add(namespace);
-        }
-      }
-
-      if (namespaceDirs.size > 0) {
-        await Promise.all(
-          Array.from(namespaceDirs).map(namespaceDir =>
-            fs.promises.mkdir(path.join(localNodeModulesDir, namespaceDir)),
-          ),
-        );
-      }
-
-      console.log(`Copying ${depsToCopy.length} deps to ${localNodeModulesDir}`);
-
-      let currentCommand: any[] = [];
-      let currentCommandLength = 0;
-      const copyCommands: string[][] = [currentCommand];
-
-      for (const dep of depsToCopy) {
-        const { namespace } = parseDepName(dep);
-        const source = path.join(globalNodeModulesDir, dep);
-        const dest = namespace ? path.join(localNodeModulesDir, namespace) : localNodeModulesDir;
-        const command = `cp -RL ${source} ${dest}`;
-
-        if (currentCommandLength + command.length + 4 > MAX_SHELL_COMMAND_LENGTH) {
-          currentCommand = [];
-          currentCommandLength = 0;
-          copyCommands.push(currentCommand);
-        }
-
-        currentCommand.push(command);
-        currentCommandLength += command.length + 4;
-      }
-
-      for (const commandsGroup of copyCommands) {
-        await execCmd(commandsGroup.join(' && '));
-      }
-
-      copyTimer.end();
-    }
-
-    totalTimer.end();
-
-    prepareTimer.print();
-    scanTimer.print();
-    copyTimer.print();
-    totalTimer.print();
-  } catch (err) {
-    console.error(err);
+  const missing = deps.firstOrderDeps.filter((dep) => !depsInPkg[dep]);
+  if (missing.length > 0) {
+    console.error('Отсутствующие зависимости в package.json:');
+    console.error(missing.join('\n'));
     process.exit(1);
   }
+
+  scanTimer.end();
+
+  const depsToCopy = [
+    ...deps.firstOrderDeps,
+    ...deps.higherOrderDeps,
+    ...deps.optionalPeerDeps.filter((p) => depsInPkg[p]),
+  ];
+
+  if (depsToCopy.length > 0) {
+    copyTimer.start();
+    console.log(`Копирование ${depsToCopy.length} зависимостей → ${targetNodeModules}`);
+
+    if (options.dryRun) {
+      console.log(depsToCopy.join('\n'));
+    } else {
+      const namespaces = new Set(
+        depsToCopy.map(parseDepName).map(({ namespace }) => namespace).filter(Boolean)
+      );
+      await Promise.all(
+        [...namespaces].map((ns) => fs.mkdir(path.join(targetNodeModules, ns||''), { recursive: true }))
+      );
+
+      for (const dep of depsToCopy) {
+        const { namespace } = parseDepName(dep);
+        const src = path.join(globalNodeModules, dep);
+        const dst = namespace
+          ? path.join(targetNodeModules, namespace, dep.split('/')[1])
+          : path.join(targetNodeModules, dep);
+
+        await fs.cp(src, dst, { recursive: true });
+      }
+    }
+    copyTimer.end();
+  }
+
+  totalTimer.end();
+  prepareTimer.print();
+  scanTimer.print();
+  copyTimer.print();
+  totalTimer.print();
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});

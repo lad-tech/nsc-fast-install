@@ -6,10 +6,12 @@
     "module": "commonjs",
     "target": "es2019",
     "allowJs": false,
+    "lib": ["ES2020", "DOM"],
     "resolveJsonModule": true,
     "skipLibCheck": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
+    "typeRoots": ["./node_modules/@types", "./src/@types"],
     "outDir": "./dist",
     "declarationDir": "./dist/types/",
     "esModuleInterop": true,                             /* Emit additional JavaScript to ease support for importing CommonJS modules. This enables 'allowSyntheticDefaultImports' for type compatibility. */
