@@ -327,9 +327,8 @@ function collectHigherOrderDeps(
       visitNode(nextNode, nextParents);
     }
   }
-
   for (const dep of firstOrderDeps) {
-    const node = isV3 ? packageLock.packages?.[dep] : packageLock.dependencies?.[dep];
+    const node = isV3 ? packageLock.packages?.[`node_modules/${dep}`] : packageLock.dependencies?.[dep];
 
     if (!node) {
       throw new Error(`collectHigherOrderDeps(): Dependency description for ${dep} not found in package-lock`);
