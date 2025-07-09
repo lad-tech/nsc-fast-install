@@ -5,7 +5,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import precinct from 'precinct';
 
-import { CollectOptions, isPackageLockV3, PackageJsonLike, PackageLock, TsConfigLike } from './types';
+import { CollectOptions, isPackageLockV3, PackageJsonLike, PackageLockLike, TsConfigLike } from './types';
 
 export interface ParseTsConfigParams {
   workDir: string;
@@ -171,9 +171,9 @@ function extractFileDeps(file: string, baseDir: string) {
 export function collectDeps(data: {
   entrypoint: string;
   baseDir: string;
-  packageLock: PackageLock;
+  packageLock: PackageLockLike;
   cwd: string;
-  options: { verbose: boolean };
+  options: CollectOptions;
 }) {
   const { entrypoint, baseDir, packageLock, cwd, options } = data;
 
@@ -254,73 +254,88 @@ function collectPeerDeps(firstOrderDeps: Set<string>, cwd: string) {
 
 function collectHigherOrderDeps(
   firstOrderDeps: Set<string>,
-  packageLock: PackageLock,
+  packageLock: PackageLockLike,
   cwd: string,
-  options: CollectOptions,
+  options: { verbose: any },
 ) {
+  if (!packageLock) {
+    throw new Error('collectHigherOrderDeps(): No package-lock');
+  }
+
   const isV3 = isPackageLockV3(packageLock);
 
-  const hasRootDeps = isV3 ? Boolean(packageLock.packages?.['']?.dependencies) : Boolean(packageLock.dependencies);
+  const rootDependencies = isV3 ? packageLock.packages?.['']?.dependencies : packageLock.dependencies;
 
-  if (firstOrderDeps.size > 0 && !hasRootDeps) {
-    throw new Error('collectHigherOrderDeps(): No dependencies found in package-lock root');
+  if (firstOrderDeps.size > 0 && !rootDependencies) {
+    throw new Error('collectHigherOrderDeps(): No dependencies field in package-lock root');
   }
 
   const ret = new Set<string>();
-  const visited = new Set<string>();
-  const verbose = options?.verbose;
+  const visitedNodes = new Set<string>();
+  const verbose = options.verbose;
 
-  function visitPackage(depName: string, parents: string[] = []) {
-    if (visited.has(depName)) return;
-    visited.add(depName);
-
-    let requires: Record<string, any> = {};
-
-    if (isV3) {
-      const pkgPath = `node_modules/${depName}`;
-      const node = packageLock.packages?.[pkgPath];
-
-      if (!node) {
-        if (verbose) {
-          console.warn(`Dependency "${depName}" not found in package-lock under path ${pkgPath}`);
-        }
-        return;
-      }
-
-      requires = {
-        ...node.dependencies,
-        ...node.peerDependencies,
-        ...node.optionalDependencies,
-      };
-    } else {
-      const node = packageLock.dependencies?.[depName];
-
-      if (!node) {
-        if (verbose) {
-          console.warn(`Dependency "${depName}" not found in package-lock.dependencies`);
-        }
-        return;
-      }
-
-      requires = node.requires || node.dependencies || {};
+  function visitNode(node: any, parents: string | any[]) {
+    if (visitedNodes.has(node)) {
+      return;
     }
 
-    for (const requiredDep of Object.keys(requires)) {
-      const isFirstOrder = firstOrderDeps.has(requiredDep);
+    visitedNodes.add(node);
 
-      if (!isFirstOrder) {
-        ret.add(requiredDep);
-        if (verbose) {
-          console.log(`Found higher order dep: ${requiredDep}`);
+    const requires = Object.keys(node.requires || {});
+    const deps = node.dependencies || {};
+
+    for (const require of requires) {
+      let nodeWithDep = null;
+      let nextParents: any = null;
+
+      if (deps[require]) {
+        nodeWithDep = node;
+        nextParents = [node, ...parents];
+      } else {
+        for (let i = 0; i < parents.length; i++) {
+          const parent = parents[i];
+
+          const parentDeps = isV3 ? parent.packages?.['']?.dependencies || {} : parent.dependencies || {};
+
+          if (parentDeps[require]) {
+            nodeWithDep = parent;
+            nextParents = parents.slice(i);
+            break;
+          }
         }
       }
 
-      visitPackage(requiredDep, [...parents, depName]);
+      if (!nodeWithDep) {
+        throw new Error(
+          `collectHigherOrderDeps(): cannot find where "${require}" is installed. ` +
+            'Looks like package-lock.json is corrupted.',
+        );
+      }
+
+      const isRoot = isV3 ? nodeWithDep === packageLock.packages?.[''] : nodeWithDep === packageLock;
+
+      if (isRoot && !firstOrderDeps.has(require)) {
+        if (verbose) {
+          console.log(`Found higher order dep ${require}`);
+        }
+
+        ret.add(require);
+      }
+
+      const nextNode = isV3 ? nodeWithDep.packages?.[require] : nodeWithDep.dependencies?.[require];
+
+      visitNode(nextNode, nextParents);
     }
   }
 
   for (const dep of firstOrderDeps) {
-    visitPackage(dep);
+    const node = isV3 ? packageLock.packages?.[dep] : packageLock.dependencies?.[dep];
+
+    if (!node) {
+      throw new Error(`collectHigherOrderDeps(): Dependency description for ${dep} not found in package-lock`);
+    }
+
+    visitNode(node, [packageLock]);
   }
 
   return Array.from(ret);

@@ -17,39 +17,23 @@ export type PackageJsonLike = {
   >;
 };
 
-export type PackageLockV3 = {
-  name?: string;
-  version?: string;
+export interface PackageLockLikeV2 {
+  lockfileVersion: 1 | 2;
+  dependencies: { [x: string]: any };
+}
+
+export type PackageLockLikeV3 = {
   lockfileVersion: 3;
   packages: {
     [path: string]: {
-      version?: string;
       dependencies?: Record<string, string>;
-      devDependencies?: Record<string, string>;
-      optionalDependencies?: Record<string, string>;
-      peerDependencies?: Record<string, string>;
-      resolved?: string;
-      integrity?: string;
     };
   };
 };
 
-export type PackageLockV2 = {
-  name?: string;
-  version?: string;
-  lockfileVersion: 1 | 2;
-  dependencies: {
-    [packageName: string]: {
-      version: string;
-      requires?: Record<string, string>;
-      dependencies?: Record<string, any>;
-    };
-  };
-};
-
-export type PackageLock = PackageLockV2 | PackageLockV3;
+export type PackageLockLike = PackageLockLikeV2 | PackageLockLikeV3;
 
 export type CollectOptions = { verbose?: boolean };
 
-export const isPackageLockV3 = (pkg: PackageLock): pkg is PackageLockV3 =>
+export const isPackageLockV3 = (pkg: PackageLockLike): pkg is PackageLockLikeV3 =>
   pkg.lockfileVersion >= 3 && 'packages' in pkg;
