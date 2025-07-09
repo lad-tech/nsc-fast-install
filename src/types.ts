@@ -27,6 +27,7 @@ export type PackageLockV3 = {
       dependencies?: Record<string, string>;
       devDependencies?: Record<string, string>;
       optionalDependencies?: Record<string, string>;
+      peerDependencies?: Record<string, string>;
       resolved?: string;
       integrity?: string;
     };
