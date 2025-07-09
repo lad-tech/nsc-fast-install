@@ -97,7 +97,7 @@ export async function findServiceEntry(data: { workDir: string; verbose: boolean
 }
 
 /** Парсит package-lock.json */
-export async function parsePackageLock(dir: string): Promise<PackageLock> {
+export async function parsePackageLock(dir: string): Promise<PackageLockLike> {
   const packageLockFile = path.join(dir, 'package-lock.json');
   try {
     const lock = await import(packageLockFile);
