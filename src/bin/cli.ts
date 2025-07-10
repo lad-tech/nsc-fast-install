@@ -84,8 +84,7 @@ async function main() {
   });
 
   const pkgPath = path.join(cwd, 'package.json');
-  const pkgRaw = await fs.readFile(pkgPath, 'utf-8');
-  const pkg: PackageJsonLike = JSON.parse(pkgRaw);
+  const pkg: PackageJsonLike  = await import(pkgPath);
   const depsInPkg = pkg.dependencies || {};
 
   const missing = deps.firstOrderDeps.filter((dep) => !depsInPkg[dep]);
