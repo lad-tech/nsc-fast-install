@@ -1,3 +1,10 @@
+## [1.16.1](https://github.com/lad-tech/nsc-fast-install/compare/v1.16.0...v1.16.1) (2025-07-10)
+
+
+### Bug Fixes
+
+* add dev dependency @semantic-release/exec ([7ab2ba3](https://github.com/lad-tech/nsc-fast-install/commit/7ab2ba32edc9807dea61645bdbc137f78712e347))
+
 # [1.16.0](https://github.com/lad-tech/nsc-fast-install/compare/v1.15.4...v1.16.0) (2025-07-10)
 
 
