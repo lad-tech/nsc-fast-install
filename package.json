@@ -1,6 +1,6 @@
 {
   "name": "@lad-tech/nsc-fast-install",
-  "version": "1.16.2",
+  "version": "1.16.3",
   "description": "Fast dependencies install for builds docker images of monorepo",
   "types": "dist/types/index.d.ts",
   "private": false,

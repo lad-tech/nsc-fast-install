@@ -1,3 +1,10 @@
+## [1.16.3](https://github.com/lad-tech/nsc-fast-install/compare/v1.16.2...v1.16.3) (2025-07-10)
+
+
+### Bug Fixes
+
+* Handle dependency copying differently based on package-lock version; improve path resolution and add verbose logging for nsc-toolkit copying in CLI script ([ae9648f](https://github.com/lad-tech/nsc-fast-install/commit/ae9648ffc705b94876629378eeee0a9d0388cdb0))
+
 ## [1.16.2](https://github.com/lad-tech/nsc-fast-install/compare/v1.16.1...v1.16.2) (2025-07-10)
 
 
