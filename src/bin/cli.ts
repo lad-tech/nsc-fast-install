@@ -122,15 +122,26 @@ async function main() {
         [...namespaces].map(ns => fs.mkdir(path.join(targetNodeModules, ns || ''), { recursive: true })),
       );
 
+      // console.log(depsToCopy);
       for (const dep of depsToCopy) {
-        const { namespace } = parseDepName(dep);
-        const src = path.join(globalNodeModules, dep);
-        const dst = namespace
-          ? path.join(targetNodeModules, namespace, dep.split('/')[1])
-          : path.join(targetNodeModules, dep);
+        if (packageLock.lockfileVersion === 3) {
+          const src = path.join(globalNodeModules, dep);
+          const dst = path.join(targetNodeModules, dep);
+          if (src.includes('nsc-toolkit')) {
+            if (options.verbose) console.log(`Копирование ${src} → ${dst}`);
+          }
+          await fs.cp(src, dst, { recursive: true });
+        } else {
+          const { namespace } = parseDepName(dep);
+          const src = path.join(globalNodeModules, dep);
+          const dst = namespace
+            ? path.join(targetNodeModules, namespace, dep.split('/')[1])
+            : path.join(targetNodeModules, dep);
 
-        if (options.verbose) console.log(`Копирование ${src} → ${dst}`);
-        await fs.cp(src, dst, { recursive: true });
+          if (options.verbose) console.log(`Копирование ${src} → ${dst}`);
+
+          await fs.cp(src, dst, { recursive: true });
+        }
       }
     }
     copyTimer.end();
