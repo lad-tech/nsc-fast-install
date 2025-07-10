@@ -13,6 +13,7 @@ plugins:
   -
     - "@semantic-release/exec"
     - prepareCmd: "cp package.json dist/package.json"
+  -  "@semantic-release/github"
   -
     - "@semantic-release/git"
     - assets:
