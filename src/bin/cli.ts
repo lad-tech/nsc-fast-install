@@ -16,7 +16,6 @@ import { Timer } from '../Timer';
 import { PackageJsonLike } from '../types';
 
 async function main() {
-
   const { version } = await import('../../package.json');
 
   const program = new Command();
@@ -43,7 +42,7 @@ async function main() {
   const cwd = process.cwd();
   const workDir = path.resolve(options.entryPoint ? path.dirname(options.entryPoint) : options.service);
 
-  if (excludeDirs.some((dir) => workDir.includes(dir))) {
+  if (excludeDirs.some(dir => workDir.includes(dir))) {
     console.warn(`Каталог ${workDir} исключён через --exclude`);
     process.exit(0);
   }
@@ -70,7 +69,7 @@ async function main() {
     console.log({ cwd, workDir, outDir, preparedEntry, targetNodeModules });
   }
 
-  await fs.rm(targetNodeModules, { recursive: true, force: true }).catch((err) => {
+  await fs.rm(targetNodeModules, { recursive: true, force: true }).catch(err => {
     if (options.verbose) console.warn(`Ошибка удаления ${targetNodeModules}:`, err.message);
   });
   await fs.mkdir(targetNodeModules, { recursive: true });
@@ -88,10 +87,10 @@ async function main() {
   });
 
   const pkgPath = path.join(cwd, 'package.json');
-  const pkg: PackageJsonLike  = await import(pkgPath);
+  const pkg: PackageJsonLike = await import(pkgPath);
   const depsInPkg = pkg.dependencies || {};
 
-  const missing = deps.firstOrderDeps.filter((dep) => !depsInPkg[dep]);
+  const missing = deps.firstOrderDeps.filter(dep => !depsInPkg[dep]);
   if (missing.length > 0) {
     console.error('Отсутствующие зависимости в package.json:');
     console.error(missing.join('\n'));
@@ -103,7 +102,7 @@ async function main() {
   const depsToCopy = [
     ...deps.firstOrderDeps,
     ...deps.higherOrderDeps,
-    ...deps.optionalPeerDeps.filter((p) => depsInPkg[p]),
+    ...deps.optionalPeerDeps.filter(p => depsInPkg[p]),
   ];
 
   if (depsToCopy.length > 0) {
@@ -114,10 +113,13 @@ async function main() {
       console.log(depsToCopy.join('\n'));
     } else {
       const namespaces = new Set(
-        depsToCopy.map(parseDepName).map(({ namespace }) => namespace).filter(Boolean)
+        depsToCopy
+          .map(parseDepName)
+          .map(({ namespace }) => namespace)
+          .filter(Boolean),
       );
       await Promise.all(
-        [...namespaces].map((ns) => fs.mkdir(path.join(targetNodeModules, ns||''), { recursive: true }))
+        [...namespaces].map(ns => fs.mkdir(path.join(targetNodeModules, ns || ''), { recursive: true })),
       );
 
       for (const dep of depsToCopy) {
@@ -127,6 +129,7 @@ async function main() {
           ? path.join(targetNodeModules, namespace, dep.split('/')[1])
           : path.join(targetNodeModules, dep);
 
+        if (options.verbose) console.log(`Копирование ${src} → ${dst}`);
         await fs.cp(src, dst, { recursive: true });
       }
     }

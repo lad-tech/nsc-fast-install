@@ -5,7 +5,15 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import precinct from 'precinct';
 
-import { CollectOptions, isPackageLockV3, PackageJsonLike, PackageLockLike, TsConfigLike } from './types';
+import {
+  CollectOptions,
+  isPackageLockV3,
+  PackageJsonLike,
+  PackageLockLike,
+  PackageLockLikeV2,
+  PackageLockLikeV3,
+  TsConfigLike,
+} from './types';
 
 export interface ParseTsConfigParams {
   workDir: string;
@@ -217,11 +225,11 @@ export function collectDeps(data: {
     throw new Error(`Unresolved imports:\n${Array.from(notResolved).join('\n')}`);
   }
 
-  const higherOrderDeps = collectHigherOrderDeps(resolved, packageLock,  options);
+  const higherOrderDeps = collectHigherOrderDeps(resolved, packageLock, options);
 
   return {
+    higherOrderDeps,
     firstOrderDeps: Array.from(resolved),
-    higherOrderDeps: Array.from(higherOrderDeps),
     optionalPeerDeps: Array.from(optionalPeerDeps),
   };
 }
@@ -256,42 +264,61 @@ function collectHigherOrderDeps(
   firstOrderDeps: Set<string>,
   packageLock: PackageLockLike,
   options: CollectOptions,
-) {
+): Array<string> {
   const isV3 = isPackageLockV3(packageLock);
   const result = new Set<string>();
   const visited = new Set<string>();
-
-  function visit(name: string) {
-    if (visited.has(name)) return;
-    visited.add(name);
-
-    let requires: Record<string, unknown> = {};
-
-    if (isV3) {
-      const node = packageLock.packages?.[`node_modules/${name}`];
-      if (!node) return;
-
-      requires = node.dependencies || {};
-    } else {
-      const node = packageLock.dependencies?.[name];
-
-      if (!node) return;
-      requires = node.requires || node.dependencies || {};
-    }
-
-    for (const dep of Object.keys(requires)) {
-      if (!firstOrderDeps.has(dep)) {
-
-        result.add(dep);
-
-        if (options.verbose) console.log(`↳ higher-order dep: ${dep}`);
+  function traverse(depName: string): void {
+    if (visited.has(depName)) return;
+    visited.add(depName);
+    const requires = isV3 ? getV3SubDep(depName, packageLock) : getV2SubDep(depName, packageLock);
+    for (const subDep of Object.keys(requires)) {
+      if (!firstOrderDeps.has(subDep)) {
+        result.add(subDep);
+        if (options.verbose) console.log(`↳ higher-order dep: ${subDep}`);
       }
-      visit(dep);
+      traverse(subDep);
     }
   }
 
   for (const dep of firstOrderDeps) {
-    visit(dep);
+    traverse(dep);
+  }
+
+  return  Array.from(result)
+    .map(item =>
+      item.startsWith('node_modules/') ? item.replace(/^node_modules\//, '') : item,
+    )
+
+}
+
+function getV2SubDep(name: string, packageLock: PackageLockLikeV2): Record<string, unknown> {
+  const node = packageLock.dependencies?.[name];
+  if (!node) return {};
+  return node.requires || node.dependencies || {};
+}
+
+function getV3SubDep(
+  depName: string,
+  packageLock: PackageLockLikeV3
+): Record<string, unknown> {
+  const preparedName = depName.startsWith('node_modules/')
+    ? depName
+    : `node_modules/${depName}`;
+
+  const node = packageLock.packages?.[preparedName];
+  if (!node?.dependencies) return {};
+
+  const result: Record<string, unknown> = {};
+
+  for (const subDep of Object.keys(node.dependencies)) {
+    const nestedPath = `${preparedName}/node_modules/${subDep}`;
+    if (nestedPath in packageLock.packages) {
+      result[nestedPath] = packageLock.packages[nestedPath];
+    } else {
+      const flatPath = `node_modules/${subDep}`;
+      result[flatPath] = packageLock.packages?.[flatPath];
+    }
   }
 
   return result;
