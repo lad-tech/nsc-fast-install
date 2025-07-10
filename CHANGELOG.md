@@ -1,3 +1,10 @@
+## [1.16.2](https://github.com/lad-tech/nsc-fast-install/compare/v1.16.1...v1.16.2) (2025-07-10)
+
+
+### Bug Fixes
+
+* version up ([ae93b88](https://github.com/lad-tech/nsc-fast-install/commit/ae93b88d5d767edc428991d61b4ad1a0ab86a88c))
+
 ## [1.16.1](https://github.com/lad-tech/nsc-fast-install/compare/v1.16.0...v1.16.1) (2025-07-10)
 
 
