@@ -9,7 +9,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "scripts": {
-    "build": "rm -rf dist/ && tsc &&  chmod +x dist/bin/cli.js",
+    "build": "rm -rf ./dist && tsc &&  chmod +x dist/src/bin/cli.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "fastInstall": "cd monorepo && npx ts-node ../src/bin/cli.ts --entryPoint services/ExampleService/start.ts  ",
     "fastInstall2": "cd monorepo && npx ts-node ../src/bin/cli.ts --service services/ExampleService --verbose ",
@@ -18,8 +18,8 @@
     "semantic-release": "semantic-release"
   },
   "bin": {
-    "fast-deps-install": "./dist/bin/cli.js",
-    "nsc-fast-install": "./dist/bin/cli.js"
+    "fast-deps-install": "./dist/src/bin/cli.js",
+    "nsc-fast-install": "./dist/src/bin/cli.js"
   },
   "devDependencies": {
     "@commitlint/cli": "^17.2.0",
