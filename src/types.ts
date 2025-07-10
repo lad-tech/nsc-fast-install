@@ -19,7 +19,8 @@ export type PackageJsonLike = {
 
 export interface PackageLockLikeV2 {
   lockfileVersion: 1 | 2;
-  dependencies: { [x: string]: any };
+  dependencies: { [x: string]: Record<string, any> };
+
 }
 
 export type PackageLockLikeV3 = {

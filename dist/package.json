@@ -1,6 +1,6 @@
 {
     "name": "@lad-tech/nsc-fast-install",
-    "version": "1.16.0",
+    "version": "1.16.1",
     "description": "Fast dependencies install for builds docker images of monorepo",
     "types": "dist/types/index.d.ts",
     "private": false,
@@ -11,6 +11,7 @@
     "scripts": {
         "build": "rm -rf ./dist && tsc &&  chmod +x dist/src/bin/cli.js",
         "test": "echo \"Error: no test specified\" && exit 1",
+        "fastInstall-art": "cd artek && npx ts-node ../src/bin/cli.ts --service services/api --verbose",
         "fastInstall": "cd monorepo && npx ts-node ../src/bin/cli.ts --entryPoint services/ExampleService/start.ts  ",
         "fastInstall2": "cd monorepo && npx ts-node ../src/bin/cli.ts --service services/ExampleService --verbose ",
         "fastInstall3": "cd monorepo && npx ts-node ../src/bin/cli.ts --service services/ExampleService --exclude ExampleService",

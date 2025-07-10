@@ -292,7 +292,7 @@ function collectHigherOrderDeps(
 
 }
 
-function getV2SubDep(name: string, packageLock: PackageLockLikeV2): Record<string, unknown> {
+function getV2SubDep(name: string, packageLock: PackageLockLikeV2): Record<string, string> {
   const node = packageLock.dependencies?.[name];
   if (!node) return {};
   return node.requires || node.dependencies || {};
