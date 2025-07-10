@@ -14,6 +14,7 @@
     "fastInstall": "cd monorepo && npx ts-node ../src/bin/cli.ts --entryPoint services/ExampleService/start.ts  ",
     "fastInstall2": "cd monorepo && npx ts-node ../src/bin/cli.ts --service services/ExampleService --verbose ",
     "fastInstall3": "cd monorepo && npx ts-node ../src/bin/cli.ts --service services/ExampleService --exclude ExampleService",
+    "fastInstall-version": "npx ts-node ./src/bin/cli.ts --version",
     "semantic-release": "semantic-release"
   },
   "bin": {

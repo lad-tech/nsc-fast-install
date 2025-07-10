@@ -16,9 +16,13 @@ import { Timer } from '../Timer';
 import { PackageJsonLike } from '../types';
 
 async function main() {
+
+  const { version } = await import('../../package.json');
+
   const program = new Command();
   program
     .description('Быстрая установка зависимостей для сборки сервисов в моно-репозитории')
+    .version(version)
     .option('--entryPoint <string>', 'Точка входа (например, services/AuthService/start.ts)')
     .option('--service <string>', 'Папка сервиса (например, services/AuthService)')
     .option('--output <string>', 'Папка для node_modules (по умолчанию — dist)', '')
