@@ -1,3 +1,10 @@
+## [2.0.1](https://github.com/lad-tech/nsc-fast-install/compare/v2.0.0...v2.0.1) (2026-05-07)
+
+
+### Bug Fixes
+
+* include dist package manifest in tarball ([2356f44](https://github.com/lad-tech/nsc-fast-install/commit/2356f44167d86668d8c2c0d1a4643420397e108f))
+
 # [2.0.0](https://github.com/lad-tech/nsc-fast-install/compare/v1.16.3...v2.0.0) (2026-05-07)
 
 
