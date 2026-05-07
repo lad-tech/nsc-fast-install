@@ -5,12 +5,16 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import {
   collectDeps,
+  collectDeclaredDependencyNames,
+  collectWorkspaceInfo,
+  copyDependencies,
+  expandDependenciesToCopy,
   findOutDirEntry,
   findServiceEntry,
   getOutDir,
-  parseDepName,
   parsePackageLock,
   parseTsConfig,
+  readPackageJson,
 } from '../helpers';
 import { Timer } from '../Timer';
 import { PackageJsonLike } from '../types';
@@ -29,6 +33,7 @@ async function main() {
     .option('--dryRun', 'Не выполнять копирование, только лог', false)
     .option('--exclude <string>', 'Папки для исключения (через запятую)', 'frontend')
     .option('--tsconfig <string>', 'Название tsconfig файла', 'tsconfig.json')
+    .option('--entryStrategy <runtime|main>', 'Стратегия выбора entrypoint для --service', 'runtime')
     .showHelpAfterError();
 
   program.parse();
@@ -47,7 +52,9 @@ async function main() {
     process.exit(0);
   }
 
-  const entryPoint = options.entryPoint || (await findServiceEntry({ workDir, verbose: options.verbose }));
+  const entryPoint = options.entryPoint
+    ? path.resolve(cwd, options.entryPoint)
+    : await findServiceEntry({ workDir, verbose: options.verbose, strategy: options.entryStrategy });
   process.chdir(workDir);
 
   const totalTimer = new Timer('TOTAL');
@@ -63,21 +70,22 @@ async function main() {
 
   const preparedEntry = await findOutDirEntry({ workDir, tsConfig, entryPoint, verbose: options.verbose });
   const targetNodeModules = path.resolve(options.output || outDir, 'node_modules');
-  const globalNodeModules = path.join(cwd, 'node_modules');
 
   if (options.verbose) {
     console.log({ cwd, workDir, outDir, preparedEntry, targetNodeModules });
   }
 
-  await fs.rm(targetNodeModules, { recursive: true, force: true }).catch(err => {
-    if (options.verbose) console.warn(`Ошибка удаления ${targetNodeModules}:`, err.message);
-  });
-  await fs.mkdir(targetNodeModules, { recursive: true });
+  if (!options.dryRun) {
+    await fs.rm(targetNodeModules, { recursive: true, force: true }).catch(err => {
+      if (options.verbose) console.warn(`Ошибка удаления ${targetNodeModules}:`, err.message);
+    });
+  }
 
   prepareTimer.end();
   scanTimer.start();
 
   const packageLock = await parsePackageLock(cwd);
+  const workspaceInfo = await collectWorkspaceInfo(cwd);
   const deps = collectDeps({
     entrypoint: preparedEntry,
     baseDir: outDir,
@@ -86,11 +94,22 @@ async function main() {
     options: { verbose: options.verbose },
   });
 
-  const pkgPath = path.join(cwd, 'package.json');
-  const pkg: PackageJsonLike = await import(pkgPath);
-  const depsInPkg = pkg.dependencies || {};
+  const pkg = await readPackageJson(cwd);
+  let targetPkg: PackageJsonLike | undefined;
+  try {
+    targetPkg = await readPackageJson(workDir);
+  } catch {
+    targetPkg = undefined;
+  }
 
-  const missing = deps.firstOrderDeps.filter(dep => !depsInPkg[dep]);
+  const declaredDeps = collectDeclaredDependencyNames({
+    rootPackage: pkg,
+    targetPackage: targetPkg,
+    workspaceInfo,
+    firstOrderDeps: deps.firstOrderDeps,
+  });
+
+  const missing = deps.firstOrderDeps.filter(dep => !declaredDeps.has(dep));
   if (missing.length > 0) {
     console.error('Отсутствующие зависимости в package.json:');
     console.error(missing.join('\n'));
@@ -99,50 +118,36 @@ async function main() {
 
   scanTimer.end();
 
-  const depsToCopy = [
+  const initialDepsToCopy = [
     ...deps.firstOrderDeps,
     ...deps.higherOrderDeps,
-    ...deps.optionalPeerDeps.filter(p => depsInPkg[p]),
+    ...deps.optionalPeerDeps.filter(p => declaredDeps.has(p)),
   ];
+  const depsToCopy = expandDependenciesToCopy({
+    deps: initialDepsToCopy,
+    packageLock,
+    workspaceInfo,
+    options: { verbose: options.verbose },
+  });
 
   if (depsToCopy.length > 0) {
     copyTimer.start();
-    console.log(`Копирование ${depsToCopy.length} зависимостей → ${targetNodeModules}`);
+    console.log(
+      options.dryRun
+        ? `Будет скопировано ${depsToCopy.length} зависимостей → ${targetNodeModules}`
+        : `Копирование ${depsToCopy.length} зависимостей → ${targetNodeModules}`,
+    );
 
     if (options.dryRun) {
       console.log(depsToCopy.join('\n'));
     } else {
-      const namespaces = new Set(
-        depsToCopy
-          .map(parseDepName)
-          .map(({ namespace }) => namespace)
-          .filter(Boolean),
-      );
-      await Promise.all(
-        [...namespaces].map(ns => fs.mkdir(path.join(targetNodeModules, ns || ''), { recursive: true })),
-      );
-
-      // console.log(depsToCopy);
-      for (const dep of depsToCopy) {
-        if (packageLock.lockfileVersion === 3) {
-          const src = path.join(globalNodeModules, dep);
-          const dst = path.join(targetNodeModules, dep);
-          if (src.includes('nsc-toolkit')) {
-            if (options.verbose) console.log(`Копирование ${src} → ${dst}`);
-          }
-          await fs.cp(src, dst, { recursive: true });
-        } else {
-          const { namespace } = parseDepName(dep);
-          const src = path.join(globalNodeModules, dep);
-          const dst = namespace
-            ? path.join(targetNodeModules, namespace, dep.split('/')[1])
-            : path.join(targetNodeModules, dep);
-
-          if (options.verbose) console.log(`Копирование ${src} → ${dst}`);
-
-          await fs.cp(src, dst, { recursive: true });
-        }
-      }
+      await copyDependencies({
+        deps: depsToCopy,
+        cwd,
+        targetNodeModules,
+        workspaceInfo,
+        options: { verbose: options.verbose },
+      });
     }
     copyTimer.end();
   }
@@ -154,7 +159,7 @@ async function main() {
   totalTimer.print();
 }
 
-main().catch((err) => {
+main().catch(err => {
   console.error(err);
   process.exit(1);
 });
