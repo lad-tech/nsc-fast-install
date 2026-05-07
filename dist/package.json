@@ -1,6 +1,6 @@
 {
   "name": "@lad-tech/nsc-fast-install",
-  "version": "1.16.3",
+  "version": "2.0.0",
   "description": "Fast dependencies install for builds docker images of monorepo",
   "files": [
     "CHANGELOG.md",

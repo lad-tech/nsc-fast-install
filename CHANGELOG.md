@@ -1,3 +1,14 @@
+# [2.0.0](https://github.com/lad-tech/nsc-fast-install/compare/v1.16.3...v2.0.0) (2026-05-07)
+
+
+* feat!: support workspace-aware dependency install ([dab1990](https://github.com/lad-tech/nsc-fast-install/commit/dab1990d08e55ac6556c2ec92183cfe5f2c6bb2f))
+
+
+### BREAKING CHANGES
+
+* --service now prefers runtime entrypoints such as start.ts before package.json#main. Use --entryStrategy main to restore the previous main-first behavior.
+* the published package no longer advertises the broken dist/types/index.d.ts types entry.
+
 ## [1.16.3](https://github.com/lad-tech/nsc-fast-install/compare/v1.16.2...v1.16.3) (2025-07-10)
 
 
