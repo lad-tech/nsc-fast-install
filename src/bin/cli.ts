@@ -106,7 +106,7 @@ async function main() {
 
   prepareTimer.end();
   scanTimer.start();
-
+  //
   const packageLock = await parsePackageLock(cwd);
   if (collectOptions.verbose) console.log(`Using package-lock ${path.join(cwd, 'package-lock.json')}`);
   const workspaceInfo = await collectWorkspaceInfo(cwd);
