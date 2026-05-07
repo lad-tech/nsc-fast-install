@@ -3,19 +3,24 @@
   "version": "2.0.0",
   "description": "Fast dependencies install for builds docker images of monorepo",
   "files": [
+    "README.md",
     "CHANGELOG.md",
     "dist/package.json",
-    "dist/src/**/*"
+    "dist/src/**/*",
+    "dist/types/**/*"
   ],
   "private": false,
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
   },
+  "engines": {
+    "node": ">=22.14.0"
+  },
   "scripts": {
-    "build": "rm -rf ./dist && tsc &&  chmod +x dist/src/bin/cli.js",
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "fastInstall-art": "cd artek && npx ts-node ../src/bin/cli.ts --service services/api --verbose",
+    "build": "rm -rf ./dist && tsc --pretty false && node scripts/normalize-dist-package.js && chmod +x dist/src/bin/cli.js",
+    "test": "npm run build && node --test test/helpers.test.js test/cli.test.js && node --test test/pack-smoke.test.js",
+    "prepack": "npm run build",
     "fastInstall": "cd monorepo && npx ts-node ../src/bin/cli.ts --entryPoint services/ExampleService/start.ts  ",
     "fastInstall2": "cd monorepo && npx ts-node ../src/bin/cli.ts --service services/ExampleService --verbose ",
     "fastInstall3": "cd monorepo && npx ts-node ../src/bin/cli.ts --service services/ExampleService --exclude ExampleService",
@@ -27,36 +32,29 @@
     "nsc-fast-install": "./dist/src/bin/cli.js"
   },
   "devDependencies": {
-    "@commitlint/cli": "^17.2.0",
-    "@commitlint/config-conventional": "^17.2.0",
+    "@commitlint/cli": "^20.5.3",
+    "@commitlint/config-conventional": "^20.5.3",
     "@semantic-release/changelog": "^6.0.2",
+    "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^10.0.1",
-    "@semantic-release/npm": "^9.0.1",
-    "@types/filing-cabinet": "^2.5.1",
-    "@types/gitignore-parser": "^0.0.0",
-    "@types/node": "^18.11.13",
-    "@typescript-eslint/eslint-plugin": "^5.43.0",
-    "eslint": "^7.32.0",
-    "eslint-config-airbnb-base": "^15.0.0",
-    "eslint-config-prettier": "^8.5.0",
-    "eslint-plugin-import": "^2.25.4",
-    "eslint-plugin-jest": "^26.1.3",
-    "eslint-plugin-node": "^11.1.0",
-    "eslint-plugin-prettier": "^4.0.0",
+    "@semantic-release/github": "^12.0.6",
+    "@semantic-release/npm": "^13.1.5",
+    "@semantic-release/release-notes-generator": "^14.1.0",
+    "@types/filing-cabinet": "^2.5.3",
+    "@types/node": "^22.19.17",
     "lefthook": "^1.2.0",
     "prettier": "^2.6.1",
-    "prettier-eslint": "^13.0.0",
-    "semantic-release": "^24.2.6",
+    "semantic-release": "^25.0.3",
     "ts-jest": "^29.4.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.3"
   },
   "dependencies": {
-    "commander": "^14.0.0",
-    "filing-cabinet": "^5.0.3",
-    "gitignore-parser": "^0.0.2",
-    "precinct": "^12.2.0"
+    "commander": "^14.0.3",
+    "filing-cabinet": "^5.4.2",
+    "jsonc-parser": "^3.3.1",
+    "precinct": "^12.3.2"
   },
   "author": "DevHive crew",
   "license": "MIT",

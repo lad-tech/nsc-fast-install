@@ -28,12 +28,13 @@ This is convenient for development, but inefficient for service images. A servic
 ## What It Does
 
 1. Resolves the service runtime entrypoint.
-2. Reads the compiled JavaScript file from `outDir`.
-3. Scans static `require()` and `import` dependencies.
-4. Resolves packages using Node-compatible resolution, including `package.json#exports`.
-5. Expands transitive dependencies from `package-lock.json`.
-6. Handles npm workspaces and copies workspace packages as real directories, not symlinks.
-7. Writes the result to `<outDir>/node_modules` or to the path passed with `--output`.
+2. Reads `tsconfig.json`, including JSONC syntax and `extends`.
+3. Reads the compiled JavaScript file from `outDir`.
+4. Scans static `require()` and `import` dependencies.
+5. Resolves packages using Node-compatible resolution, including `package.json#exports`.
+6. Expands transitive dependencies from `package-lock.json`.
+7. Handles npm workspaces and copies workspace packages as real directories, not symlinks.
+8. Writes the result to `<outDir>/node_modules`, to `<output>/node_modules`, or to the exact path passed with `--nodeModulesOutput`.
 
 ## Install
 
@@ -70,7 +71,7 @@ npm run build --workspace services/gate
 npx nsc-fast-install --service services/gate
 ```
 
-If `outDir` or the compiled entrypoint does not exist, the command fails.
+If `outDir` or the compiled entrypoint does not exist, the command fails with a non-zero exit code.
 
 ## Entrypoint Resolution
 
@@ -167,7 +168,7 @@ This means service-local workspace dependencies do not need to be duplicated in 
 ## Docker Example
 
 ```dockerfile
-FROM node:20-alpine AS build
+FROM node:22-alpine AS build
 
 WORKDIR /app
 
@@ -178,7 +179,7 @@ RUN npm ci
 RUN npm run build --workspace services/gate
 RUN npx nsc-fast-install --service services/gate
 
-FROM node:20-alpine
+FROM node:22-alpine
 
 WORKDIR /app
 
@@ -196,10 +197,12 @@ Adjust the final `CMD` to match your service output path.
 | `--entryPoint <path>` | `string` | - | Source or compiled entrypoint, for example `services/gate/start.ts`. |
 | `--service <path>` | `string` | - | Service directory, for example `services/gate`. |
 | `--entryStrategy <runtime\|main>` | `string` | `runtime` | Entrypoint strategy for `--service`. |
-| `--output <path>` | `string` | `outDir` | Directory where `node_modules` will be created. |
+| `--output <path>` | `string` | `outDir` | Parent directory where `node_modules` will be created. Relative paths are resolved from the service directory. |
+| `--nodeModulesOutput <path>` | `string` | - | Exact target `node_modules` path. Cannot be combined with `--output`. |
 | `--exclude <list>` | `string` | `frontend` | Comma-separated directory names to skip. |
 | `--tsconfig <name>` | `string` | `tsconfig.json` | Service tsconfig filename. |
 | `--dryRun` | `boolean` | `false` | Print dependencies without copying or deleting target `node_modules`. |
+| `--json` | `boolean` | `false` | Print machine-readable dry-run JSON. Implies `--dryRun`. |
 | `--verbose` | `boolean` | `false` | Print resolver and copy details. |
 | `--version` | `boolean` | - | Print package version. |
 
@@ -213,10 +216,26 @@ npx nsc-fast-install --service services/gate --dryRun
 
 Dry-run mode does not remove or create the target `node_modules`.
 
+For CI and Docker scripts, use JSON output:
+
+```bash
+npx nsc-fast-install --service services/gate --json
+```
+
+The JSON payload includes `entrypoint`, `targetNodeModules`, `deps`, and `missing`.
+
+## Published Package
+
+The npm package includes compiled JavaScript, source maps, generated declaration files, README, changelog, and the generated `dist/package.json` used by the CLI version command.
+
+`dist/package.json` is created during `build`/`prepack`; it is not meant to be edited by hand.
+
 ## Requirements
 
+- Node.js 22.14 or newer.
 - Node.js project with `package-lock.json`.
 - Compiled JavaScript output must exist before running the tool.
+- `tsconfig.json` may use comments, trailing commas, and `extends`.
 - Static imports or requires must be present in the compiled output. Dynamic runtime-only imports cannot always be detected.
 - npm workspaces are supported through the root `workspaces` field.
 
@@ -227,6 +246,17 @@ Dry-run mode does not remove or create the target `node_modules`.
 The service has not been built, or `compilerOptions.outDir` points to a different directory.
 
 Build the service first.
+
+### `Compiled entrypoint not found`
+
+The source entrypoint was found, but the matching JavaScript file was not found in `outDir`.
+
+Check:
+
+- whether the service build completed successfully;
+- `compilerOptions.rootDir`;
+- whether `package.json#main` points to a library entry instead of a runtime entry;
+- whether you need `--entryPoint` for this service.
 
 ### `Unresolved imports`
 

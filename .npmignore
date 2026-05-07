@@ -1,8 +1,6 @@
 /monorepo
 /artek
 .dockerignore
-.eslintignore
-.eslintrc.js
 .github
 .gitlab-ci.yml
 .prettierignore

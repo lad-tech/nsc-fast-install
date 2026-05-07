@@ -3,13 +3,13 @@ declare module 'precinct' {
   interface PrecinctOptions {
     type?: 'es6' | 'commonjs' | 'amd' | 'ts' | 'tsx';
     includeCore?: boolean;
-    ast?: any;
+    ast?: unknown;
   }
 
   interface Precinct {
     (source: string | Buffer, options?: PrecinctOptions): string[];
     paperwork(filePath: string, options?: PrecinctOptions): string[];
-    ast: any;
+    ast: unknown;
   }
 
   const precinct: Precinct;

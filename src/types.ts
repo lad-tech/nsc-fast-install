@@ -1,18 +1,27 @@
+export type DependencyMap = Record<string, string>;
+
+export type TsCompilerOptionsLike = {
+  readonly baseUrl?: string;
+  readonly outDir?: string;
+  readonly rootDir?: string;
+};
+
 export type TsConfigLike = {
   readonly compilerOptions?: {
     readonly outDir?: string;
     readonly baseUrl?: string;
     readonly rootDir?: string;
   };
+  readonly configPath: string;
 };
 
 export type PackageJsonLike = {
   readonly name?: string;
   readonly main?: string;
-  readonly dependencies?: Record<string, string>;
-  readonly optionalDependencies?: Record<string, string>;
-  readonly devDependencies?: Record<string, string>;
-  readonly peerDependencies?: Record<string, string>;
+  readonly dependencies?: DependencyMap;
+  readonly optionalDependencies?: DependencyMap;
+  readonly devDependencies?: DependencyMap;
+  readonly peerDependencies?: DependencyMap;
   readonly peerDependenciesMeta?: Record<
     string,
     {
@@ -22,18 +31,19 @@ export type PackageJsonLike = {
   readonly workspaces?: string[] | { readonly packages?: string[] };
 };
 
+export type PackageLockNode = {
+  readonly dependencies?: DependencyMap;
+  readonly requires?: DependencyMap;
+};
+
 export interface PackageLockLikeV2 {
   lockfileVersion: 1 | 2;
-  dependencies: { [x: string]: Record<string, any> };
+  dependencies: Record<string, PackageLockNode>;
 }
 
 export type PackageLockLikeV3 = {
   lockfileVersion: 3;
-  packages: {
-    [path: string]: {
-      dependencies?: Record<string, string>;
-    };
-  };
+  packages: Record<string, PackageLockNode>;
 };
 
 export type PackageLockLike = PackageLockLikeV2 | PackageLockLikeV3;
