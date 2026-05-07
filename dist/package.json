@@ -4,6 +4,7 @@
   "description": "Fast dependencies install for builds docker images of monorepo",
   "files": [
     "CHANGELOG.md",
+    "dist/package.json",
     "dist/src/**/*"
   ],
   "private": false,
