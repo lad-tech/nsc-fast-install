@@ -1,3 +1,10 @@
+## [2.0.2](https://github.com/lad-tech/nsc-fast-install/compare/v2.0.1...v2.0.2) (2026-05-07)
+
+
+### Bug Fixes
+
+* version bump ([629114f](https://github.com/lad-tech/nsc-fast-install/commit/629114f0c8f0444c890460143106725fb95f926a))
+
 ## [2.0.1](https://github.com/lad-tech/nsc-fast-install/compare/v2.0.0...v2.0.1) (2026-05-07)
 
 
