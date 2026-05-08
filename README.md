@@ -33,8 +33,9 @@ This is convenient for development, but inefficient for service images. A servic
 4. Scans static `require()` and `import` dependencies.
 5. Resolves packages using Node-compatible resolution, including `package.json#exports`.
 6. Expands transitive dependencies from `package-lock.json`.
-7. Handles npm workspaces and copies workspace packages as real directories, not symlinks.
-8. Writes the result to `<outDir>/node_modules`, to `<output>/node_modules`, or to the exact path passed with `--nodeModulesOutput`.
+7. Recursively adds installed runtime `optionalDependencies` of copied npm packages, such as platform packages used by native modules.
+8. Handles npm workspaces and copies workspace packages as real directories, not symlinks.
+9. Writes the result to `<outDir>/node_modules`, to `<output>/node_modules`, or to the exact path passed with `--nodeModulesOutput`.
 
 ## Install
 
@@ -201,6 +202,7 @@ Adjust the final `CMD` to match your service output path.
 | `--nodeModulesOutput <path>` | `string` | - | Exact target `node_modules` path. Cannot be combined with `--output`. |
 | `--exclude <list>` | `string` | `frontend` | Comma-separated directory names to skip. |
 | `--tsconfig <name>` | `string` | `tsconfig.json` | Service tsconfig filename. |
+| `--skipOptionalRuntimeDeps` | `boolean` | `false` | Do not copy installed runtime `optionalDependencies` of selected npm packages. |
 | `--dryRun` | `boolean` | `false` | Print dependencies without copying or deleting target `node_modules`. |
 | `--json` | `boolean` | `false` | Print machine-readable dry-run JSON. Implies `--dryRun`. |
 | `--verbose` | `boolean` | `false` | Print resolver and copy details. |
@@ -238,6 +240,7 @@ The npm package includes compiled JavaScript, source maps, generated declaration
 - `tsconfig.json` may use comments, trailing commas, and `extends`.
 - Static imports or requires must be present in the compiled output. Dynamic runtime-only imports cannot always be detected.
 - npm workspaces are supported through the root `workspaces` field.
+- Runtime `optionalDependencies` are copied only when they are installed in the source `node_modules`; missing optional packages for other platforms are ignored.
 
 ## Troubleshooting
 

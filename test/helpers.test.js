@@ -228,10 +228,132 @@ test('expandDependenciesToCopy follows transitive workspace deps', () => {
   assert.deepEqual(new Set(deps), new Set(['app', 'shared', 'left-pad']));
 });
 
+test('expandDependenciesToCopy adds installed recursive optional runtime deps', async () => {
+  const root = await makeTempDir();
+  await writeInstalledPackage(root, 'sharp', {
+    name: 'sharp',
+    optionalDependencies: {
+      '@img/sharp-linuxmusl-x64': '1.0.0',
+      '@img/sharp-darwin-x64': '1.0.0',
+    },
+  });
+  await writeInstalledPackage(root, '@img/sharp-linuxmusl-x64', {
+    name: '@img/sharp-linuxmusl-x64',
+    optionalDependencies: {
+      '@img/sharp-libvips-linuxmusl-x64': '1.0.0',
+    },
+  });
+  await writeInstalledPackage(root, '@img/sharp-libvips-linuxmusl-x64', {
+    name: '@img/sharp-libvips-linuxmusl-x64',
+  });
+
+  const deps = expandDependenciesToCopy({
+    deps: ['sharp'],
+    cwd: root,
+    packageLock: {
+      lockfileVersion: 3,
+      packages: {
+        '': {},
+        'node_modules/sharp': {},
+      },
+    },
+    workspaceInfo: emptyWorkspaceInfo(),
+    options: { verbose: false },
+  });
+
+  assert.deepEqual(
+    new Set(deps),
+    new Set(['sharp', '@img/sharp-linuxmusl-x64', '@img/sharp-libvips-linuxmusl-x64']),
+  );
+});
+
+test('expandDependenciesToCopy can skip optional runtime deps', async () => {
+  const root = await makeTempDir();
+  await writeInstalledPackage(root, 'sharp', {
+    name: 'sharp',
+    optionalDependencies: {
+      '@img/sharp-linuxmusl-x64': '1.0.0',
+    },
+  });
+  await writeInstalledPackage(root, '@img/sharp-linuxmusl-x64', {
+    name: '@img/sharp-linuxmusl-x64',
+  });
+
+  const deps = expandDependenciesToCopy({
+    deps: ['sharp'],
+    cwd: root,
+    packageLock: {
+      lockfileVersion: 3,
+      packages: {
+        '': {},
+        'node_modules/sharp': {},
+      },
+    },
+    workspaceInfo: emptyWorkspaceInfo(),
+    options: { verbose: false, skipOptionalRuntimeDeps: true },
+  });
+
+  assert.deepEqual(deps, ['sharp']);
+});
+
+test('expandDependenciesToCopy ignores bad package.json while scanning optional runtime deps', async () => {
+  const root = await makeTempDir();
+  await fs.mkdir(path.join(root, 'node_modules', 'missing-package-json'), { recursive: true });
+  await fs.mkdir(path.join(root, 'node_modules', 'bad-package-json'), { recursive: true });
+  await fs.writeFile(path.join(root, 'node_modules', 'bad-package-json', 'package.json'), '{');
+
+  const deps = expandDependenciesToCopy({
+    deps: ['missing-package-json', 'bad-package-json'],
+    cwd: root,
+    packageLock: {
+      lockfileVersion: 3,
+      packages: {
+        '': {},
+      },
+    },
+    workspaceInfo: emptyWorkspaceInfo(),
+    options: { verbose: false },
+  });
+
+  assert.deepEqual(deps, ['missing-package-json', 'bad-package-json']);
+});
+
+test('expandDependenciesToCopy does not blindly add absent workspace optional deps', () => {
+  const workspaceInfo = emptyWorkspaceInfo();
+  workspaceInfo.packageNames.add('app');
+  workspaceInfo.packageJsons.set('app', {
+    name: 'app',
+    optionalDependencies: {
+      'optional-native': '^1.0.0',
+    },
+  });
+
+  const deps = expandDependenciesToCopy({
+    deps: ['app'],
+    cwd: '/missing-root',
+    packageLock: {
+      lockfileVersion: 3,
+      packages: {
+        '': {},
+      },
+    },
+    workspaceInfo,
+    options: { verbose: false },
+  });
+
+  assert.deepEqual(deps, ['app']);
+});
+
 function emptyWorkspaceInfo() {
   return {
     packageNames: new Set(),
     packageDirs: new Map(),
     packageJsons: new Map(),
   };
+}
+
+async function writeInstalledPackage(root, name, pkg) {
+  const dir = path.join(root, 'node_modules', name);
+  await fs.mkdir(dir, { recursive: true });
+  await fs.writeFile(path.join(dir, 'package.json'), JSON.stringify(pkg));
 }

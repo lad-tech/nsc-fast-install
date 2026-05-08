@@ -5,9 +5,8 @@ import * as path from 'path';
 import precinct from 'precinct';
 
 import { collectHigherOrderDeps, getLockfileSubDependencyNames, normalizeLockDepName } from './lockfile';
-import { getPackageDependencyNames } from './packageJson';
 import { CollectOptions, PackageJsonLike, PackageLockLike } from './types';
-import { getErrorMessage } from './utils';
+import { getErrorMessage, isRecord } from './utils';
 import { WorkspaceInfo } from './workspaces';
 
 /** Разбирает имя зависимости на namespace и name */
@@ -76,6 +75,7 @@ export function collectDeps(data: {
 export function expandDependenciesToCopy(data: {
   deps: string[];
   packageLock: PackageLockLike;
+  cwd?: string;
   workspaceInfo: WorkspaceInfo;
   options: CollectOptions;
 }): string[] {
@@ -83,10 +83,11 @@ export function expandDependenciesToCopy(data: {
   const result = new Set<string>();
   const queue = data.deps.map(normalizeLockDepName);
 
-  function enqueue(depName: string) {
+  function enqueue(depName: string): boolean {
     const normalizedDepName = normalizeLockDepName(depName);
-    if (result.has(normalizedDepName) || queue.includes(normalizedDepName)) return;
+    if (result.has(normalizedDepName) || queue.includes(normalizedDepName)) return false;
     queue.push(normalizedDepName);
+    return true;
   }
 
   while (queue.length > 0) {
@@ -97,18 +98,99 @@ export function expandDependenciesToCopy(data: {
 
     const workspacePackage = workspaceInfo.packageJsons.get(depName);
     if (workspacePackage) {
-      for (const workspaceDep of getPackageDependencyNames(workspacePackage)) {
-        if (options.verbose) console.log(`↳ workspace dep: ${depName} -> ${workspaceDep}`);
-        enqueue(workspaceDep);
+      for (const workspaceDep of getWorkspaceDependencyNames(workspacePackage, data.cwd, workspaceInfo)) {
+        const added = enqueue(workspaceDep);
+        if (added && options.verbose) console.log(`↳ workspace dep: ${depName} -> ${workspaceDep}`);
       }
     }
 
     for (const subDep of getLockfileSubDependencyNames(depName, packageLock)) {
       enqueue(subDep);
     }
+
+    const cwd = data.cwd;
+    const shouldScanOptionalDeps =
+      cwd && !options.skipOptionalRuntimeDeps && !isWorkspacePackageSymlink(cwd, depName, workspaceInfo);
+    if (shouldScanOptionalDeps) {
+      for (const optionalDep of getInstalledOptionalRuntimeDependencyNames(cwd, depName, workspaceInfo, options)) {
+        const added = enqueue(optionalDep);
+        if (added && options.verbose) console.log(`↳ optional runtime dep: ${depName} -> ${optionalDep}`);
+      }
+    }
   }
 
   return Array.from(result);
+}
+
+function getWorkspaceDependencyNames(
+  workspacePackage: PackageJsonLike,
+  cwd: string | undefined,
+  workspaceInfo: WorkspaceInfo,
+): string[] {
+  const result = new Set(Object.keys(workspacePackage.dependencies || {}));
+
+  for (const optionalDep of Object.keys(workspacePackage.optionalDependencies || {})) {
+    if (!cwd || isInstalledNpmPackage(cwd, optionalDep, workspaceInfo)) {
+      result.add(optionalDep);
+    }
+  }
+
+  return Array.from(result);
+}
+
+function getInstalledOptionalRuntimeDependencyNames(
+  cwd: string,
+  depName: string,
+  workspaceInfo: WorkspaceInfo,
+  options: CollectOptions,
+): string[] {
+  const pkg = readInstalledPackageJson(cwd, depName, options);
+  if (!pkg || !isRecord(pkg.optionalDependencies)) return [];
+
+  return Object.keys(pkg.optionalDependencies).filter(optionalDep =>
+    isInstalledNpmPackage(cwd, optionalDep, workspaceInfo),
+  );
+}
+
+function readInstalledPackageJson(
+  cwd: string,
+  depName: string,
+  options: CollectOptions,
+): PackageJsonLike | undefined {
+  const pkgFile = path.join(cwd, 'node_modules', depName, 'package.json');
+
+  try {
+    const json = JSON.parse(fss.readFileSync(pkgFile, 'utf8'));
+    if (!isRecord(json)) throw new Error('package.json root must be an object');
+    return json as PackageJsonLike;
+  } catch (err) {
+    if (options.verbose) {
+      console.warn(`Warning: failed to read optional runtime deps for ${depName}: ${getErrorMessage(err)}`);
+    }
+    return undefined;
+  }
+}
+
+function isInstalledNpmPackage(cwd: string, depName: string, workspaceInfo: WorkspaceInfo): boolean {
+  const installedPath = path.join(cwd, 'node_modules', depName);
+
+  try {
+    const stat = fss.lstatSync(installedPath);
+    return !workspaceInfo.packageNames.has(depName) || !stat.isSymbolicLink();
+  } catch {
+    return false;
+  }
+}
+
+function isWorkspacePackageSymlink(cwd: string, depName: string, workspaceInfo: WorkspaceInfo): boolean {
+  const normalizedDepName = normalizeLockDepName(depName);
+  if (!workspaceInfo.packageNames.has(normalizedDepName)) return false;
+
+  try {
+    return fss.lstatSync(path.join(cwd, 'node_modules', normalizedDepName)).isSymbolicLink();
+  } catch {
+    return true;
+  }
 }
 
 type ExtractFileDepsResult = {

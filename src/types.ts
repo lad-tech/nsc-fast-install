@@ -48,7 +48,10 @@ export type PackageLockLikeV3 = {
 
 export type PackageLockLike = PackageLockLikeV2 | PackageLockLikeV3;
 
-export type CollectOptions = { verbose: boolean };
+export type CollectOptions = {
+  verbose: boolean;
+  skipOptionalRuntimeDeps?: boolean;
+};
 
 export const isPackageLockV3 = (pkg: PackageLockLike): pkg is PackageLockLikeV3 =>
   pkg.lockfileVersion >= 3 && 'packages' in pkg;

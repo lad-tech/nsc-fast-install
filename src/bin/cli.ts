@@ -30,6 +30,7 @@ type CliOptions = {
   exclude: string;
   tsconfig: string;
   entryStrategy: 'runtime' | 'main';
+  skipOptionalRuntimeDeps: boolean;
 };
 
 async function main() {
@@ -49,6 +50,7 @@ async function main() {
     .option('--exclude <string>', 'Папки для исключения (через запятую)', 'frontend')
     .option('--tsconfig <string>', 'Название tsconfig файла', 'tsconfig.json')
     .option('--entryStrategy <runtime|main>', 'Стратегия выбора entrypoint для --service', 'runtime')
+    .option('--skipOptionalRuntimeDeps', 'Не копировать установленные runtime optionalDependencies пакетов', false)
     .showHelpAfterError();
 
   program.parse();
@@ -60,7 +62,10 @@ async function main() {
 
   const excludeDirs = parseCommaSeparatedList(options.exclude);
   const dryRun = options.dryRun || options.json;
-  const collectOptions = { verbose: options.verbose && !options.json };
+  const collectOptions = {
+    verbose: options.verbose && !options.json,
+    skipOptionalRuntimeDeps: options.skipOptionalRuntimeDeps,
+  };
   const cwd = process.cwd();
   const workDirInput = options.entryPoint ? path.dirname(options.entryPoint) : options.service;
   if (!workDirInput) throw new Error('Укажите --entryPoint или --service');
@@ -141,6 +146,7 @@ async function main() {
   const depsToCopy = expandDependenciesToCopy({
     deps: initialDepsToCopy,
     packageLock,
+    cwd,
     workspaceInfo,
     options: collectOptions,
   });
