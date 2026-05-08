@@ -1,3 +1,10 @@
+## [2.0.3](https://github.com/lad-tech/nsc-fast-install/compare/v2.0.2...v2.0.3) (2026-05-08)
+
+
+### Bug Fixes
+
+* copy installed optional runtime dependencies ([0b5d74f](https://github.com/lad-tech/nsc-fast-install/commit/0b5d74fbf4fc80ffa1158b951540d9838e4a5bb6))
+
 ## [2.0.2](https://github.com/lad-tech/nsc-fast-install/compare/v2.0.1...v2.0.2) (2026-05-07)
 
 
